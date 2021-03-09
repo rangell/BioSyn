@@ -237,6 +237,175 @@ def predict_topk(biosyn,
 
     return result
 
+
+def embed_and_index(biosyn, 
+                    names):
+    """
+    Parameters
+    ----------
+    TODO: Add argument details
+    """
+    # Embed dictionary
+    sparse_embeds = biosyn.embed_sparse(names=names, show_progress=True)
+    dense_embeds = biosyn.embed_dense(names=names, show_progress=True)
+
+    # Build sparse index
+    sparse_index = nmslib.init(
+        method='hnsw',
+        space='negdotprod_sparse_fast',
+        data_type=nmslib.DataType.SPARSE_VECTOR
+    )
+    sparse_index.addDataPointBatch(sparse_embeds)
+    sparse_index.createIndex({'post': 2}, print_progress=False)
+
+    # Build dense index
+    d = dense_embeds.shape[1]
+    nembeds = dense_embeds.shape[0]
+    if nembeds < 10000:  # if the number of embeddings is small, don't approximate
+        dense_index = faiss.IndexFlatIP(d)
+        dense_index.add(dense_embeds)
+    else:
+        # number of quantized cells
+        nlist = int(math.floor(math.sqrt(nembeds)))
+        # number of the quantized cells to probe
+        nprobe = int(math.floor(math.sqrt(nlist)))
+        quantizer = faiss.IndexFlatIP(d)
+        dense_index = faiss.IndexIVFFlat(
+            quantizer, d, nlist, faiss.METRIC_INNER_PRODUCT
+        )
+        dense_index.train(dense_embeds)
+        dense_index.add(dense_embeds)
+        dense_index.nprobe = nprobe
+
+    # Return embeddings and indexes
+    return sparse_embeds, dense_embeds, sparse_index, dense_index
+
+
+def get_query_nn(biosyn,
+                 topk, 
+                 sparse_embeds, 
+                 dense_embeds, 
+                 sparse_index, 
+                 dense_index, 
+                 q_sparse_embed, 
+                 q_dense_embed):
+    """
+    Parameters
+    ----------
+    TODO: Add argument details
+    """
+    # Get sparse similarity weight to final score
+    score_sparse_wt = biosyn.get_sparse_weight().item()
+
+    # Find sparse-index k nearest neighbours
+    sparse_knn = sparse_index.knnQueryBatch(
+        q_sparse_embed, k=topk, num_threads=20)
+    sparse_knn_idxs, _ = zip(*sparse_knn)
+    sparse_knn_idxs = np.asarray(sparse_knn_idxs).astype(np.int64)
+    # Find dense-index k nearest neighbours
+    _, dense_knn_idxs = dense_index.search(q_dense_embed, topk)
+    dense_knn_idxs = dense_knn_idxs.astype(np.int64)
+
+    # Get unique candidates
+    cand_idxs = np.unique(np.concatenate(
+        sparse_knn_idxs.flatten(), dense_knn_idxs.flatten()))
+
+    # Compute query-candidate similarity scores
+    sparse_scores = biosyn.get_score_matrix(
+        query_embeds=q_sparse_embed,
+        dict_embeds=sparse_embeds[cand_idxs, :]
+    ).todense().flatten()
+    dense_scores = biosyn.get_score_matrix(
+        query_embeds=q_sparse_embed,
+        dict_embeds=dense_embeds[cand_idxs, :]
+    ).flatten()
+    if score_mode == 'hybrid':
+        scores = score_sparse_wt * sparse_scores + dense_scores
+    elif score_mode == 'dense':
+        scores = dense_scores
+    elif score_mode == 'sparse':
+        scores = sparse_scores
+    else:
+        raise NotImplementedError()
+
+    return cand_idxs, scores
+
+
+def predict_topk_cluster_link(biosyn,
+                              eval_dictionary,
+                              eval_queries,
+                              topk,
+                              score_mode='hybrid'):
+    """
+    Parameters
+    ----------
+    score_mode : str
+        hybrid, dense, sparse
+    
+    Naming Convention
+    -----------------
+    - Dictionary == Entities
+    - Queries == Mentions
+    
+    Assumptions
+    -----------
+    - Type is not given
+    - Predictions must be returned for every query mention
+    - No composites
+    """
+    n_entities = eval_dictionary.shape[0]
+    n_mentions = eval_queries.shape[0]
+
+    # Initialize a graph to store mention-mention and mention-entity similarity score edges
+    joint_graph = {
+        rows: np.array([]),
+        cols: np.array([]),
+        data: np.array([]),
+        shape: (n_mentions, n_entities+n_mentions)
+    }
+
+    # Embed dictionary and build indexes
+    dict_sparse_embeds, dict_dense_embeds, dict_sparse_index, dict_dense_index = embed_and_index(
+        biosyn, eval_dictionary[:, 0])
+
+    # Embed mention queries and build indexes
+    men_sparse_embeds, men_dense_embeds, men_sparse_index, men_dense_index = embed_and_index(
+        biosyn, eval_queries[:, 0])
+
+    # Find topK similar entities and mentions for each mention query
+    for eval_query_idx, eval_query in enumerate(tqdm(eval_queries, total=len(eval_queries))):
+        # Slicing to get an array
+        men_sparse_embed = men_sparse_embeds[eval_query_idx:eval_query_idx+1]
+        men_dense_embed = men_dense_embeds[eval_query_idx:eval_query_idx+1]
+
+        # Fetch nearest-neighbour entity candidates
+        dict_cand_idxs, dict_cand_scores = get_query_nn(
+            biosyn, topk, dict_sparse_embeds, dict_dense_embeds, dict_sparse_index, dict_dense_index, men_sparse_embed, men_dense_embed)
+        # Add mention-entity edges to the joint graph
+        joint_graph.rows = np.append(
+            joint_graph.rows, [eval_query_idx]*len(dict_cand_idxs))
+        joint_graph.cols = np.append(joint_graph.cols, dict_cand_idxs)
+        joint_graph.data = np.append(joint_graph.data, dict_cand_scores)
+
+        # Fetch nearest-neighbour mention candidates
+        men_cand_idxs, men_cand_scores = get_query_nn(
+            biosyn, topk+1, men_sparse_embeds, men_dense_embeds, men_sparse_index, men_dense_index, men_sparse_embed, men_dense_embed)
+        # Filter returned candidates to remove the mention query
+        men_cand_idxs, men_cand_scores = men_cand_idxs[np.where(
+            men_cand_idxs != eval_query_idx)], men_cand_scores[np.where(men_cand_idxs != eval_query_idx)]
+        # Add mention-mention edges to the joint graph
+        joint_graph.rows = np.append(
+            joint_graph.rows, [eval_query_idx]*len(men_cand_idxs))
+        joint_graph.cols = np.append(
+            joint_graph.cols, n_entities+men_cand_idxs)
+        joint_graph.data = np.append(joint_graph.data, men_cand_scores)
+
+        # Filter duplicates from graph
+        joint_graph.rows, joint_graph.cols, joint_graph.data = zip(
+            *set(zip(joint_graph.rows, joint_graph.cols, joint_graph.data)))
+    return None
+
+
 def evaluate(biosyn,
              eval_dictionary,
              eval_queries,
