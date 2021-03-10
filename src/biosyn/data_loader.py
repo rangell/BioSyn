@@ -120,7 +120,7 @@ class DictionaryDataset():
                 elif len(line_split) == 3:
                     cui, sty, name = line_split
                 else:
-                    raise NotImplementedError()
+                    raise ValueError("Cannot read dictionary lines where the split length is not 2 or 3")
                 assert sty != ''
                 data.append((name, sty, cui))
         
