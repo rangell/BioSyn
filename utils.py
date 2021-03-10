@@ -6,6 +6,8 @@ import pdb
 from tqdm import tqdm
 import faiss
 import nmslib
+from scipy.sparse import coo_matrix
+from special_partition.special_partition import special_partition
 
 from IPython import embed
 
@@ -331,6 +333,53 @@ def get_query_nn(biosyn,
     return cand_idxs, scores
 
 
+def partition_graph(graph):
+    """
+    Parameters
+    ----------
+    TODO: Add argument details
+    """
+    n_entities = graph.shape[1] - graph.shape[0]
+    # Preprocess graph data based on `special_partition` input requirements
+    _row = np.concatenate((graph.rows, graph.cols))
+    _col = np.concatenate((graph.cols, graph.rows))
+    _data = np.concatenate((graph.data, graph.data))
+    tuples = zip(_row, _col, _data)
+    tuples = sorted(tuples, key=lambda x: z(x[1], -x[0])) # "sorted this way for nice DFS"
+    special_row, special_col, special_data = zip(*tuples)
+    special_row = np.asarray(special_row, dtype=np.int)
+    special_col = np.asarray(special_col, dtype=np.int)
+    special_data = np.asarray(special_data)
+
+    # Construct the coo matrix
+    graph = coo_matrix(
+        (special_data, (special_row, special_col)),
+        shape=graph.shape)
+
+    # Create siamese indices for easy lookup during partitioning
+    edge_indices = {e: i for i, e in enumerate(zip(special_row, special_col))}
+    siamese_indices = [edge_indices[(c, r)]
+                       for r, c in zip(special_row, special_col)]
+    siamese_indices = np.asarray(siamese_indices)
+
+    # Order the edges in ascending order of similarity scores
+    ordered_edge_indices = np.argsort(special_data)
+
+    # Determine which edges to keep in the partitioned graph
+    keep_edge_mask = special_partition(
+        special_row,
+        special_col,
+        ordered_edge_indices,
+        siamese_indices,
+        n_entities)
+
+    # Return the partitioned graph
+    return coo_matrix(
+        (special_data[keep_edge_mask],
+        (special_row[keep_edge_mask], special_col[keep_edge_mask])),
+        shape=graph.shape)
+
+
 def predict_topk_cluster_link(biosyn,
                               eval_dictionary,
                               eval_queries,
@@ -380,7 +429,8 @@ def predict_topk_cluster_link(biosyn,
 
         # Fetch nearest-neighbour entity candidates
         dict_cand_idxs, dict_cand_scores = get_query_nn(
-            biosyn, topk, dict_sparse_embeds, dict_dense_embeds, dict_sparse_index, dict_dense_index, men_sparse_embed, men_dense_embed)
+            biosyn, topk, dict_sparse_embeds, dict_dense_embeds, 
+            dict_sparse_index, dict_dense_index, men_sparse_embed, men_dense_embed)
         # Add mention-entity edges to the joint graph
         joint_graph.rows = np.append(
             joint_graph.rows, [eval_query_idx]*len(dict_cand_idxs))
@@ -389,7 +439,8 @@ def predict_topk_cluster_link(biosyn,
 
         # Fetch nearest-neighbour mention candidates
         men_cand_idxs, men_cand_scores = get_query_nn(
-            biosyn, topk+1, men_sparse_embeds, men_dense_embeds, men_sparse_index, men_dense_index, men_sparse_embed, men_dense_embed)
+            biosyn, topk+1, men_sparse_embeds, men_dense_embeds, 
+            men_sparse_index, men_dense_index, men_sparse_embed, men_dense_embed)
         # Filter returned candidates to remove the mention query
         men_cand_idxs, men_cand_scores = men_cand_idxs[np.where(
             men_cand_idxs != eval_query_idx)], men_cand_scores[np.where(men_cand_idxs != eval_query_idx)]
@@ -397,12 +448,16 @@ def predict_topk_cluster_link(biosyn,
         joint_graph.rows = np.append(
             joint_graph.rows, [eval_query_idx]*len(men_cand_idxs))
         joint_graph.cols = np.append(
-            joint_graph.cols, n_entities+men_cand_idxs)
+            joint_graph.cols, n_entities+men_cand_idxs) # Adding mentions at an offset of maximum entities
         joint_graph.data = np.append(joint_graph.data, men_cand_scores)
 
-        # Filter duplicates from graph
-        joint_graph.rows, joint_graph.cols, joint_graph.data = zip(
-            *set(zip(joint_graph.rows, joint_graph.cols, joint_graph.data)))
+    # Filter duplicates from graph
+    joint_graph.rows, joint_graph.cols, joint_graph.data = zip(
+        *set(zip(joint_graph.rows, joint_graph.cols, joint_graph.data)))
+    
+    # Partition graph based on cluster-linking constraints
+    partitioned_graph = partition_graph(joint_graph)
+
     return None
 
 
