@@ -29,6 +29,7 @@ def parse_args():
 
     # Run settings
     parser.add_argument('--use_cuda',  action="store_true")
+    parser.add_argument('--use_cluster_linking', action="store_true")
     parser.add_argument('--normalize_vecs',  action="store_true")
     parser.add_argument('--type_given',  action="store_true")
     parser.add_argument('--topk',  type=int, default=20)
@@ -91,7 +92,8 @@ def main(args):
         eval_queries=eval_queries,
         topk=args.topk,
         score_mode=args.score_mode,
-        type_given=args.type_given
+        type_given=args.type_given,
+        use_cluster_linking=args.use_cluster_linking
     )
     
     # Try to report accuracies from acc@1 to acc@64
@@ -105,9 +107,10 @@ def main(args):
         LOGGER.info("acc@{}={}".format(accuracy_level, result_evalset['acc' + str(accuracy_level)]))
     
     if args.save_predictions:
-        output_file = os.path.join(args.output_dir,"predictions_eval.json")
+        output_file = os.path.join(args.output_dir,f"{__import__('calendar').timegm(__import__('time').gmtime())}_predictions_eval.json")
         with open(output_file, 'w') as f:
             json.dump(result_evalset, f, indent=2)
+            print(f"\nPredictions saved at: {output_file}")
 
 if __name__ == '__main__':
     args = parse_args()

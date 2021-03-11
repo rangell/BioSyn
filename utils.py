@@ -576,7 +576,8 @@ def evaluate(biosyn,
              eval_queries,
              topk,
              score_mode='hybrid',
-             type_given=False):
+             type_given=False,
+             use_cluster_linking=False):
     """
     predict topk and evaluate accuracy
     
@@ -594,15 +595,20 @@ def evaluate(biosyn,
         hybrid, dense, sparse
     type_given : bool
         whether or not to restrict entity set to ones with gold type
+    use_cluster_linking : bool
+        flag indicating whether the cluster linking inference should be applied or not
 
     Returns
     -------
     result : dict
         accuracy and candidates
     """
-    result = predict_topk(
-        biosyn, eval_dictionary, eval_queries, topk, score_mode, type_given
-    )
-    result = evaluate_topk_acc(result)
-    
+    if use_cluster_linking:
+        result = predict_topk_cluster_link(
+            biosyn, eval_dictionary, eval_queries, topk, score_mode)
+    else:
+        result = predict_topk(
+            biosyn, eval_dictionary, eval_queries, topk, score_mode, type_given)
+        result = evaluate_topk_acc(result)
+
     return result
