@@ -481,10 +481,10 @@ def predict_topk_cluster_link(biosyn,
 
     # Initialize a graph to store mention-mention and mention-entity similarity score edges
     joint_graph = {
-        rows: np.array([]),
-        cols: np.array([]),
-        data: np.array([]),
-        shape: (n_entities+n_mentions, n_entities+n_mentions)
+        'rows': np.array([]),
+        'cols': np.array([]),
+        'data': np.array([]),
+        'shape': (n_entities+n_mentions, n_entities+n_mentions)
     }
 
     # Embed entity dictionary and build indexes
@@ -505,10 +505,10 @@ def predict_topk_cluster_link(biosyn,
             biosyn, topk, dict_sparse_embeds, dict_dense_embeds, 
             dict_sparse_index, dict_dense_index, men_sparse_embed, men_dense_embed)
         # Add mention-entity edges to the joint graph
-        joint_graph.rows = np.append(
-            joint_graph.rows, [n_entities+eval_query_idx]*len(dict_cand_idxs))
-        joint_graph.cols = np.append(joint_graph.cols, dict_cand_idxs)
-        joint_graph.data = np.append(joint_graph.data, dict_cand_scores)
+        joint_graph['rows'] = np.append(
+            joint_graph['rows'], [n_entities+eval_query_idx]*len(dict_cand_idxs))
+        joint_graph['cols'] = np.append(joint_graph['cols'], dict_cand_idxs)
+        joint_graph['data'] = np.append(joint_graph['data'], dict_cand_scores)
 
         # Fetch NN mention candidates
         men_cand_idxs, men_cand_scores = get_query_nn(
@@ -518,15 +518,15 @@ def predict_topk_cluster_link(biosyn,
         men_cand_idxs, men_cand_scores = men_cand_idxs[np.where(
             men_cand_idxs != eval_query_idx)], men_cand_scores[np.where(men_cand_idxs != eval_query_idx)]
         # Add mention-mention edges to the joint graph
-        joint_graph.rows = np.append(
-            joint_graph.rows, [n_entities+eval_query_idx]*len(men_cand_idxs))
-        joint_graph.cols = np.append(
-            joint_graph.cols, n_entities+men_cand_idxs) # Adding mentions at an offset of maximum entities
-        joint_graph.data = np.append(joint_graph.data, men_cand_scores)
+        joint_graph['rows'] = np.append(
+            joint_graph['rows'], [n_entities+eval_query_idx]*len(men_cand_idxs))
+        joint_graph['cols'] = np.append(
+            joint_graph['cols'], n_entities+men_cand_idxs) # Adding mentions at an offset of maximum entities
+        joint_graph['data'] = np.append(joint_graph['data'], men_cand_scores)
 
     # Filter duplicates from graph
-    joint_graph.rows, joint_graph.cols, joint_graph.data = zip(
-        *set(zip(joint_graph.rows, joint_graph.cols, joint_graph.data)))
+    joint_graph['rows'], joint_graph['cols'], joint_graph['data'] = zip(
+        *set(zip(joint_graph['rows'], joint_graph['cols'], joint_graph['data'])))
     
     # Partition graph based on cluster-linking constraints
     partitioned_graph, clusters = partition_graph(
