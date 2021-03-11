@@ -355,7 +355,7 @@ def get_query_nn(biosyn,
         dict_embeds=sparse_embeds[cand_idxs, :]
     ).todense().flatten()
     dense_scores = biosyn.get_score_matrix(
-        query_embeds=q_sparse_embed,
+        query_embeds=q_dense_embed,
         dict_embeds=dense_embeds[cand_idxs, :]
     ).flatten()
     if score_mode == 'hybrid':
