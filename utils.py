@@ -305,7 +305,8 @@ def get_query_nn(biosyn,
                  sparse_index, 
                  dense_index, 
                  q_sparse_embed, 
-                 q_dense_embed):
+                 q_dense_embed,
+                 score_mode):
     """
     Parameters
     ----------
@@ -325,6 +326,8 @@ def get_query_nn(biosyn,
         2-D array containing the sparse query embedding
     q_dense_embed : ndarray
         2-D array containing the dense query embedding
+    score_mode : str
+        "hybrid", "dense", "sparse"
 
     Returns
     -------
@@ -502,18 +505,18 @@ def predict_topk_cluster_link(biosyn,
 
         # Fetch NN entity candidates
         dict_cand_idxs, dict_cand_scores = get_query_nn(
-            biosyn, topk, dict_sparse_embeds, dict_dense_embeds, 
-            dict_sparse_index, dict_dense_index, men_sparse_embed, men_dense_embed)
+            biosyn, topk, dict_sparse_embeds, dict_dense_embeds, dict_sparse_index, 
+            dict_dense_index, men_sparse_embed, men_dense_embed, score_mode)
         # Add mention-entity edges to the joint graph
         joint_graph['rows'] = np.append(
             joint_graph['rows'], [n_entities+eval_query_idx]*len(dict_cand_idxs))
         joint_graph['cols'] = np.append(joint_graph['cols'], dict_cand_idxs)
         joint_graph['data'] = np.append(joint_graph['data'], dict_cand_scores)
 
-        # Fetch NN mention candidates
+        # Fetch NN mention candidates; retrieve k+1 since the query mention will always be returned
         men_cand_idxs, men_cand_scores = get_query_nn(
-            biosyn, topk+1, men_sparse_embeds, men_dense_embeds, 
-            men_sparse_index, men_dense_index, men_sparse_embed, men_dense_embed)
+            biosyn, topk+1, men_sparse_embeds, men_dense_embeds, men_sparse_index, 
+            men_dense_index, men_sparse_embed, men_dense_embed, score_mode)
         # Filter candidates to remove mention query
         men_cand_idxs, men_cand_scores = men_cand_idxs[np.where(
             men_cand_idxs != eval_query_idx)], men_cand_scores[np.where(men_cand_idxs != eval_query_idx)]
