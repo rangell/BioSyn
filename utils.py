@@ -347,7 +347,7 @@ def get_query_nn(biosyn,
 
     # Get unique candidates
     cand_idxs = np.unique(np.concatenate(
-        sparse_knn_idxs.flatten(), dense_knn_idxs.flatten()))
+        (sparse_knn_idxs.flatten(), dense_knn_idxs.flatten())))
 
     # Compute query-candidate similarity scores
     sparse_scores = biosyn.get_score_matrix(
