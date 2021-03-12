@@ -9,6 +9,7 @@ import nmslib
 from scipy.sparse import coo_matrix
 from scipy.sparse.csgraph import connected_components
 from special_partition.special_partition import special_partition
+from collections import defaultdict
 
 from IPython import embed
 
@@ -356,7 +357,7 @@ def get_query_nn(biosyn,
     sparse_scores = biosyn.get_score_matrix(
         query_embeds=q_sparse_embed,
         dict_embeds=sparse_embeds[cand_idxs, :]
-    ).todense().flatten()
+    ).todense().getA1()
     dense_scores = biosyn.get_score_matrix(
         query_embeds=q_dense_embed,
         dict_embeds=dense_embeds[cand_idxs, :]
@@ -392,13 +393,13 @@ def partition_graph(graph, n_entities, return_clusters=False):
         (optional) contains arrays of connected component indices of the graph
     """
     # Make the graph symmetric - needed for cluster inference after partitioning
-    _row = np.concatenate((graph.rows, graph.cols))
-    _col = np.concatenate((graph.cols, graph.rows))
-    _data = np.concatenate((graph.data, graph.data))
+    _row = np.concatenate((graph['rows'], graph['cols']))
+    _col = np.concatenate((graph['cols'], graph['rows']))
+    _data = np.concatenate((graph['data'], graph['data']))
     
     # Sort data for efficient DFS
     tuples = zip(_row, _col, _data)
-    tuples = sorted(tuples, key=lambda x: z(x[1], -x[0]))
+    tuples = sorted(tuples, key=lambda x: (x[1], -x[0]))
     special_row, special_col, special_data = zip(*tuples)
     special_row = np.asarray(special_row, dtype=np.int)
     special_col = np.asarray(special_col, dtype=np.int)
@@ -407,7 +408,7 @@ def partition_graph(graph, n_entities, return_clusters=False):
     # Construct the coo matrix
     graph = coo_matrix(
         (special_data, (special_row, special_col)),
-        shape=graph.shape)
+        shape=graph['shape'])
 
     # Create siamese indices for simple lookup during partitioning
     edge_indices = {e: i for i, e in enumerate(zip(special_row, special_col))}
@@ -513,9 +514,9 @@ def predict_topk_cluster_link(biosyn,
         joint_graph['cols'] = np.append(joint_graph['cols'], dict_cand_idxs)
         joint_graph['data'] = np.append(joint_graph['data'], dict_cand_scores)
 
-        # Fetch NN mention candidates; retrieve k+1 since the query mention will always be returned
+        # Fetch NN mention candidates
         men_cand_idxs, men_cand_scores = get_query_nn(
-            biosyn, topk+1, men_sparse_embeds, men_dense_embeds, men_sparse_index, 
+            biosyn, topk, men_sparse_embeds, men_dense_embeds, men_sparse_index, 
             men_dense_index, men_sparse_embed, men_dense_embed, score_mode)
         # Filter candidates to remove mention query
         men_cand_idxs, men_cand_scores = men_cand_idxs[np.where(
@@ -528,8 +529,8 @@ def predict_topk_cluster_link(biosyn,
         joint_graph['data'] = np.append(joint_graph['data'], men_cand_scores)
 
     # Filter duplicates from graph
-    joint_graph['rows'], joint_graph['cols'], joint_graph['data'] = zip(
-        *set(zip(joint_graph['rows'], joint_graph['cols'], joint_graph['data'])))
+    joint_graph['rows'], joint_graph['cols'], joint_graph['data'] = list(map(np.array, zip(
+    *set(zip(joint_graph['rows'], joint_graph['cols'], joint_graph['data'])))))
     
     # Partition graph based on cluster-linking constraints
     partitioned_graph, clusters = partition_graph(
@@ -541,8 +542,8 @@ def predict_topk_cluster_link(biosyn,
         'n_mentions': n_mentions,
         'k_candidates': topk,
         'accuracy': 0,
-        'success': [],
-        'failure': []
+        'failure': [],
+        'success': []
     }
     for cluster in tqdm(clusters.values()):
         # The lowest value in the cluster should always be the entity
