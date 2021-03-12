@@ -397,6 +397,9 @@ def partition_graph(graph, n_entities, return_clusters=False):
     _col = np.concatenate((graph['cols'], graph['rows']))
     _data = np.concatenate((graph['data'], graph['data']))
     
+    # Filter duplicates
+    _row, _col, _data = list(map(np.array, zip(*set(zip(_row, _col, _data)))))
+
     # Sort data for efficient DFS
     tuples = zip(_row, _col, _data)
     tuples = sorted(tuples, key=lambda x: (x[1], -x[0]))
@@ -454,7 +457,8 @@ def predict_topk_cluster_link(biosyn,
                               eval_dictionary,
                               eval_queries,
                               topk,
-                              score_mode='hybrid'):
+                              score_mode='hybrid',
+                              debug_mode=False):
     """
     Parameters
     ----------
@@ -468,6 +472,8 @@ def predict_topk_cluster_link(biosyn,
         the number of nearest-neighbour candidates to consider
     score_mode : str
         "hybrid", "dense", "sparse"
+    debug_mode : bool
+        Flag to enable reporting debug statistics
     
     Returns
     -------
@@ -527,10 +533,6 @@ def predict_topk_cluster_link(biosyn,
         joint_graph['cols'] = np.append(
             joint_graph['cols'], n_entities+men_cand_idxs) # Adding mentions at an offset of maximum entities
         joint_graph['data'] = np.append(joint_graph['data'], men_cand_scores)
-
-    # Filter duplicates from graph
-    joint_graph['rows'], joint_graph['cols'], joint_graph['data'] = list(map(np.array, zip(
-    *set(zip(joint_graph['rows'], joint_graph['cols'], joint_graph['data'])))))
     
     # Partition graph based on cluster-linking constraints
     partitioned_graph, clusters = partition_graph(
@@ -545,24 +547,45 @@ def predict_topk_cluster_link(biosyn,
         'failure': [],
         'success': []
     }
+    _debug_n_mens_evaluated, _debug_clusters_wo_entities, _debug_clusters_w_mult_entities = 0, 0, 0
+
     for cluster in tqdm(clusters.values()):
         # The lowest value in the cluster should always be the entity
         pred_entity_idx = cluster[0]
+        # Track the graph index of the entity in the cluster
+        pred_entity_idxs = [pred_entity_idx]
         if pred_entity_idx >= n_entities:
+            # If the first element is a mention, then the cluster does not have an entity
+            _debug_clusters_wo_entities += 1
             continue
         pred_entity = eval_dictionary[pred_entity_idx]
-        pred_entity_cuis = pred_entity[2].split('|')
+        pred_entity_cuis = pred_entity[2].replace('+', '|').split('|')
+        _debug_tracked_mult_entities = False
         for i in range(1, len(cluster)):
             men_idx = cluster[i] - n_entities
+            if men_idx < 0:
+                # If elements after the first are entities, then the cluster has multiple entities
+                if not _debug_tracked_mult_entities:
+                    _debug_clusters_w_mult_entities += 1
+                    _debug_tracked_mult_entities = True
+                # Track the graph indices of each entity in the cluster
+                pred_entity_idxs.append(cluster[i])
+                # Predict based on all entities in the cluster
+                pred_entity_cuis += list(set(eval_dictionary[cluster[i]][2].replace('+', '|').split('|')) - set(pred_entity_cuis))
+                continue
+            _debug_n_mens_evaluated += 1
             men_query = eval_queries[men_idx]
             men_golden_cuis = men_query[1].replace('+', '|').split('|')
             report_obj = {
                 'pm_id': men_query[3],
-                'mention': men_query[0],
-                'golden_cui': men_query[1],
-                'predicted_name': pred_entity[0],
-                'predicted_cui': pred_entity[2]
+                'mention_name': men_query[0],
+                'mention_gold_cui': men_query[1],
+                'predicted_name': '|'.join(eval_dictionary[pred_entity_idxs,0]),
+                'predicted_cui': '|'.join(pred_entity_cuis),
             }
+            if debug_mode:
+                report_obj['graph_mention_idx'] = cluster[i]
+                report_obj['graph_entity_idx'] = '|'.join(map(str, pred_entity_idxs))
             # Correct prediction
             if not set(pred_entity_cuis).isdisjoint(men_golden_cuis):
                 results['accuracy'] += 1
@@ -570,7 +593,19 @@ def predict_topk_cluster_link(biosyn,
             # Incorrect prediction
             else:
                 results['failure'].append(report_obj)
-    results['accuracy'] = f"{results['accuracy'] / float(n_mentions) * 100} %"
+    results['accuracy'] = f"{results['accuracy'] / float(_debug_n_mens_evaluated if debug_mode else n_mentions) * 100} %"
+
+    if debug_mode:
+        # Report debug statistics
+        results['n_mentions_evaluated'] = _debug_n_mens_evaluated
+        results['n_clusters'] = len(clusters)
+        results['n_clusters_wo_entities'] = _debug_clusters_wo_entities
+        results['n_clusters_w_mult_entities'] = _debug_clusters_w_mult_entities
+    else:
+        # Run sanity checks
+        assert n_mentions == _debug_n_mens_evaluated
+        assert _debug_clusters_wo_entities == 0
+        assert _debug_clusters_w_mult_entities == 0
 
     return results
 
@@ -581,7 +616,8 @@ def evaluate(biosyn,
              topk,
              score_mode='hybrid',
              type_given=False,
-             use_cluster_linking=False):
+             use_cluster_linking=False,
+             debug_mode=False):
     """
     predict topk and evaluate accuracy
     
@@ -601,6 +637,8 @@ def evaluate(biosyn,
         whether or not to restrict entity set to ones with gold type
     use_cluster_linking : bool
         flag indicating whether the cluster linking inference should be applied or not
+    debug_mode : bool
+        Flag to enable reporting debug statistics for cluster linking
 
     Returns
     -------
@@ -609,7 +647,7 @@ def evaluate(biosyn,
     """
     if use_cluster_linking:
         result = predict_topk_cluster_link(
-            biosyn, eval_dictionary, eval_queries, topk, score_mode)
+            biosyn, eval_dictionary, eval_queries, topk, score_mode, debug_mode)
     else:
         result = predict_topk(
             biosyn, eval_dictionary, eval_queries, topk, score_mode, type_given)
