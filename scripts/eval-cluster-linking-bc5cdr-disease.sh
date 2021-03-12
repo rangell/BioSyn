@@ -20,3 +20,4 @@ python eval.py \
     --topk 8 \
     --max_length 25 \
     --save_predictions
+    #--debug_mode

@@ -30,6 +30,7 @@ def parse_args():
     # Run settings
     parser.add_argument('--use_cuda',  action="store_true")
     parser.add_argument('--use_cluster_linking', action="store_true")
+    parser.add_argument('--debug_mode', action="store_true")
     parser.add_argument('--normalize_vecs',  action="store_true")
     parser.add_argument('--type_given',  action="store_true")
     parser.add_argument('--topk',  type=int, default=20)
@@ -93,7 +94,8 @@ def main(args):
         topk=args.topk,
         score_mode=args.score_mode,
         type_given=args.type_given,
-        use_cluster_linking=args.use_cluster_linking
+        use_cluster_linking=args.use_cluster_linking,
+        debug_mode=args.debug_mode
     )
     
     # Try to report accuracies from acc@1 to acc@64
