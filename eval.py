@@ -98,15 +98,16 @@ def main(args):
         debug_mode=args.debug_mode
     )
     
-    # Try to report accuracies from acc@1 to acc@64
-    for i in range(6):
-        accuracy_level = 2 ** i
-        
-        # accuracies above arg.topk wouldn't be available
-        if accuracy_level > args.topk:
-            break
-        
-        LOGGER.info("acc@{}={}".format(accuracy_level, result_evalset['acc' + str(accuracy_level)]))
+    if not args.use_cluster_linking:
+        # Try to report accuracies from acc@1 to acc@64
+        for i in range(6):
+            accuracy_level = 2 ** i
+            
+            # accuracies above arg.topk wouldn't be available
+            if accuracy_level > args.topk:
+                break
+            
+            LOGGER.info("acc@{}={}".format(accuracy_level, result_evalset['acc' + str(accuracy_level)]))
     
     if args.save_predictions:
         output_file = os.path.join(args.output_dir,f"{__import__('calendar').timegm(__import__('time').gmtime())}_predictions_eval.json")
