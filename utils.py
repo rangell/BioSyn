@@ -518,7 +518,7 @@ def predict_topk_cluster_link(biosyn,
 
         # Fetch NN entity candidates
         dict_cand_idxs, dict_cand_scores = get_query_nn(
-            biosyn, topk, dict_sparse_embeds, dict_dense_embeds, dict_sparse_index, 
+            biosyn, 1, dict_sparse_embeds, dict_dense_embeds, dict_sparse_index, 
             dict_dense_index, men_sparse_embed, men_dense_embed, score_mode)
         # Add mention-entity edges to the joint graph
         joint_graph['rows'] = np.append(
