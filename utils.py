@@ -375,9 +375,10 @@ def get_query_nn(biosyn,
         raise ValueError()
 
     # Return the topk neighbours
+    
     cand_idxs, scores = zip(
         *sorted(zip(cand_idxs, scores), key=lambda x: -x[1]))
-    return cand_idxs[:topk], scores[:topk]
+    return np.array(cand_idxs[:topk]), np.array(scores[:topk])
 
 
 def partition_graph(graph, n_entities, return_clusters=False):
