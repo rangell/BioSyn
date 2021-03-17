@@ -314,7 +314,7 @@ def get_query_nn(biosyn,
     biosyn : BioSyn
         trained biosyn model
     topk : int
-        the number of nearest-neighbour candidates to consider
+        the number of nearest-neighbour candidates to retrieve
     sparse_embeds : ndarray
         matrix of sparse embeddings
     dense_embeds : ndarray
@@ -337,16 +337,19 @@ def get_query_nn(biosyn,
     scores : array
         similarity scores for each nearest neighbour
     """
+    # To accomodate the approximate-nature of the knn procedure, retrieve more samples and then filter down
+    k = max(16, 2*topk)
+
     # Get sparse similarity weight to final score
     score_sparse_wt = biosyn.get_sparse_weight().item()
 
     # Find sparse-index k nearest neighbours
     sparse_knn = sparse_index.knnQueryBatch(
-        q_sparse_embed, k=topk, num_threads=20)
+        q_sparse_embed, k=k, num_threads=20)
     sparse_knn_idxs, _ = zip(*sparse_knn)
     sparse_knn_idxs = np.asarray(sparse_knn_idxs).astype(np.int64)
     # Find dense-index k nearest neighbours
-    _, dense_knn_idxs = dense_index.search(q_dense_embed, topk)
+    _, dense_knn_idxs = dense_index.search(q_dense_embed, k)
     dense_knn_idxs = dense_knn_idxs.astype(np.int64)
 
     # Get unique candidates
@@ -369,9 +372,12 @@ def get_query_nn(biosyn,
     elif score_mode == 'sparse':
         scores = sparse_scores
     else:
-        raise NotImplementedError()
+        raise ValueError()
 
-    return cand_idxs, scores
+    # Return the topk neighbours
+    cand_idxs, scores = zip(
+        *sorted(zip(cand_idxs, scores), key=lambda x: -x[1]))
+    return cand_idxs[:topk], scores[:topk]
 
 
 def partition_graph(graph, n_entities, return_clusters=False):
