@@ -581,8 +581,8 @@ def predict_topk_cluster_link(biosyn,
     # Initialize graphs to store mention-mention and mention-entity similarity score edges;
     # Keyed on the k-nearest mentions retrieved
     joint_graphs = {}
-    for topk in topk_vals:
-        joint_graphs[topk] = {
+    for k in topk_vals:
+        joint_graphs[k] = {
             'rows': np.array([]),
             'cols': np.array([]),
             'data': np.array([]),
