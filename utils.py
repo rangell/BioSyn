@@ -538,7 +538,7 @@ def analyzeClusters(clusters, eval_dictionary, eval_queries, topk, debug_mode):
 
 # Parallelizable function to partition and analyze each graph
 def partition_analyze(args):
-    joint_graph, k, n_entities, eval_dictionary, eval_queries, debug_mode = *args
+    joint_graph, k, n_entities, eval_dictionary, eval_queries, debug_mode = args
     # Partition graph based on cluster-linking constraints
     partitioned_graph, clusters = partition_graph(
         joint_graph, n_entities, return_clusters=True)
