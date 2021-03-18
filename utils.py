@@ -10,6 +10,7 @@ from scipy.sparse import coo_matrix
 from scipy.sparse.csgraph import connected_components
 from special_partition.special_partition import special_partition
 from collections import defaultdict
+from multiprocessing import Pool
 
 from IPython import embed
 
@@ -333,9 +334,9 @@ def get_query_nn(biosyn,
     Returns
     -------
     cand_idxs : array
-        nearest neighbour indices for the query
+        nearest neighbour indices for the query, sorted in descending order of scores
     scores : array
-        similarity scores for each nearest neighbour
+        similarity scores for each nearest neighbour, sorted in descending order
     """
     # To accomodate the approximate-nature of the knn procedure, retrieve more samples and then filter down
     k = max(16, 2*topk)
@@ -460,92 +461,11 @@ def partition_graph(graph, n_entities, return_clusters=False):
 
     return partitioned_graph
 
-def predict_topk_cluster_link(biosyn,
-                              eval_dictionary,
-                              eval_queries,
-                              topk,
-                              score_mode='hybrid',
-                              debug_mode=False):
-    """
-    Parameters
-    ----------
-    biosyn : BioSyn
-        trained biosyn model
-    eval_dictionary : ndarray
-        entity dictionary to evaluate
-    eval_queries : ndarray
-        mention queries to evaluate
-    topk : int
-        the number of nearest-neighbour candidates to consider
-    score_mode : str
-        "hybrid", "dense", "sparse"
-    debug_mode : bool
-        Flag to enable reporting debug statistics
-    
-    Returns
-    -------
-    results : dict
-        Contains n_entities, n_mentions, k_candidates, accuracy, success[], failure[]
-  
-    Assumptions
-    -----------
-    - type is not given
-    - no composites
-    - predictions returned for every query mention
-    """
+def analyzeClusters(clusters, eval_dictionary, eval_queries, topk, debug_mode):
+    # TODO: Add documentation
+
     n_entities = eval_dictionary.shape[0]
-    n_mentions = eval_queries.shape[0]
 
-    # Initialize a graph to store mention-mention and mention-entity similarity score edges
-    joint_graph = {
-        'rows': np.array([]),
-        'cols': np.array([]),
-        'data': np.array([]),
-        'shape': (n_entities+n_mentions, n_entities+n_mentions)
-    }
-
-    # Embed entity dictionary and build indexes
-    dict_sparse_embeds, dict_dense_embeds, dict_sparse_index, dict_dense_index = embed_and_index(
-        biosyn, eval_dictionary[:, 0])
-
-    # Embed mention queries and build indexes
-    men_sparse_embeds, men_dense_embeds, men_sparse_index, men_dense_index = embed_and_index(
-        biosyn, eval_queries[:, 0])
-
-    # Find topK similar entities and mentions for each mention query
-    for eval_query_idx, eval_query in enumerate(tqdm(eval_queries, total=len(eval_queries))):
-        men_sparse_embed = men_sparse_embeds[eval_query_idx:eval_query_idx+1] # Slicing to get a 2-D array
-        men_dense_embed = men_dense_embeds[eval_query_idx:eval_query_idx+1]
-
-        # Fetch NN entity candidates
-        dict_cand_idxs, dict_cand_scores = get_query_nn(
-            biosyn, 1, dict_sparse_embeds, dict_dense_embeds, dict_sparse_index, 
-            dict_dense_index, men_sparse_embed, men_dense_embed, score_mode)
-        # Add mention-entity edges to the joint graph
-        joint_graph['rows'] = np.append(
-            joint_graph['rows'], [n_entities+eval_query_idx]*len(dict_cand_idxs))
-        joint_graph['cols'] = np.append(joint_graph['cols'], dict_cand_idxs)
-        joint_graph['data'] = np.append(joint_graph['data'], dict_cand_scores)
-
-        # Fetch NN mention candidates
-        men_cand_idxs, men_cand_scores = get_query_nn(
-            biosyn, topk, men_sparse_embeds, men_dense_embeds, men_sparse_index, 
-            men_dense_index, men_sparse_embed, men_dense_embed, score_mode)
-        # Filter candidates to remove mention query
-        men_cand_idxs, men_cand_scores = men_cand_idxs[np.where(
-            men_cand_idxs != eval_query_idx)], men_cand_scores[np.where(men_cand_idxs != eval_query_idx)]
-        # Add mention-mention edges to the joint graph
-        joint_graph['rows'] = np.append(
-            joint_graph['rows'], [n_entities+eval_query_idx]*len(men_cand_idxs))
-        joint_graph['cols'] = np.append(
-            joint_graph['cols'], n_entities+men_cand_idxs) # Adding mentions at an offset of maximum entities
-        joint_graph['data'] = np.append(joint_graph['data'], men_cand_scores)
-    
-    # Partition graph based on cluster-linking constraints
-    partitioned_graph, clusters = partition_graph(
-        joint_graph, n_entities, return_clusters=True)
-
-    # Infer predictions from clusters
     results = {
         'n_entities': n_entities,
         'n_mentions': n_mentions,
@@ -614,6 +534,122 @@ def predict_topk_cluster_link(biosyn,
         assert _debug_clusters_wo_entities == 0
         assert _debug_clusters_w_mult_entities == 0
 
+    return results
+
+
+def predict_topk_cluster_link(biosyn,
+                              eval_dictionary,
+                              eval_queries,
+                              topk,
+                              score_mode='hybrid',
+                              debug_mode=False):
+    """
+    Parameters
+    ----------
+    biosyn : BioSyn
+        trained biosyn model
+    eval_dictionary : ndarray
+        entity dictionary to evaluate
+    eval_queries : ndarray
+        mention queries to evaluate
+    topk : int
+        the number of nearest-neighbour mention candidates to consider
+    score_mode : str
+        "hybrid", "dense", "sparse"
+    debug_mode : bool
+        Flag to enable reporting debug statistics
+    
+    Returns
+    -------
+    results : dict
+        Contains n_entities, n_mentions, k_candidates, accuracy, success[], failure[]
+  
+    Assumptions
+    -----------
+    - type is not given
+    - no composites
+    - predictions returned for every query mention
+    """
+    n_entities = eval_dictionary.shape[0]
+    n_mentions = eval_queries.shape[0]
+
+    # Values of k to run the evaluation against
+    topk_vals = [0, *[2**i for i in range(int(math.log(topk, 2)) + 1)]]
+    # Store the maximum evaluation k
+    topk = topk_vals[-1]
+
+    # Initialize graphs to store mention-mention and mention-entity similarity score edges;
+    # Keyed on the k-nearest mentions retrieved
+    joint_graphs = {}
+    for topk in topk_vals:
+        joint_graphs[topk] = {
+            'rows': np.array([]),
+            'cols': np.array([]),
+            'data': np.array([]),
+            'shape': (n_entities+n_mentions, n_entities+n_mentions)
+        }
+
+    # Embed entity dictionary and build indexes
+    dict_sparse_embeds, dict_dense_embeds, dict_sparse_index, dict_dense_index = embed_and_index(
+        biosyn, eval_dictionary[:, 0])
+
+    # Embed mention queries and build indexes
+    men_sparse_embeds, men_dense_embeds, men_sparse_index, men_dense_index = embed_and_index(
+        biosyn, eval_queries[:, 0])
+
+    # Find the most similar entity and topk mentions for each mention query
+    for eval_query_idx, eval_query in enumerate(tqdm(eval_queries, total=len(eval_queries))):
+        men_sparse_embed = men_sparse_embeds[eval_query_idx:eval_query_idx+1] # Slicing to get a 2-D array
+        men_dense_embed = men_dense_embeds[eval_query_idx:eval_query_idx+1]
+
+        # Fetch nearest entity candidate
+        dict_cand_idx, dict_cand_score = get_query_nn(
+            biosyn, 1, dict_sparse_embeds, dict_dense_embeds, dict_sparse_index, 
+            dict_dense_index, men_sparse_embed, men_dense_embed, score_mode)
+
+        # Fetch (k+1) NN mention candidates
+        men_cand_idxs, men_cand_scores = get_query_nn(
+            biosyn, topk + 1, men_sparse_embeds, men_dense_embeds, men_sparse_index,
+            men_dense_index, men_sparse_embed, men_dense_embed, score_mode)
+        # Filter candidates to remove mention query and keep only the top k candidates
+        filter_mask = men_cand_idxs != eval_query_idx
+        if not np.all(filter_mask):
+            men_cand_idxs, men_cand_scores = men_cand_idxs[filter_mask], men_cand_scores[filter_mask]
+        else:
+            men_cand_idxs, men_cand_scores = men_cand_idxs[:topk], men_cand_scores[:topk]
+
+        # Add edges to the graphs
+        for k in joint_graphs:
+            joint_graph = joint_graphs[k]
+            # Add mention-entity edge
+            joint_graph['rows'] = np.append(
+                joint_graph['rows'], [n_entities+eval_query_idx]) # Mentions added at an offset of maximum entities
+            joint_graph['cols'] = np.append(joint_graph['cols'], dict_cand_idx)
+            joint_graph['data'] = np.append(joint_graph['data'], dict_cand_score)
+            if k > 0:
+                # Add mention-mention edges
+                joint_graph['rows'] = np.append(
+                    joint_graph['rows'], [n_entities+eval_query_idx]*len(men_cand_idxs[:k]))
+                joint_graph['cols'] = np.append(
+                    joint_graph['cols'], n_entities+men_cand_idxs[:k])
+                joint_graph['data'] = np.append(joint_graph['data'], men_cand_scores[:k])
+    
+    # Parallelizable function to partition and analyze each graph
+    def partition_analyze(joint_graph, k):
+        # Partition graph based on cluster-linking constraints
+        partitioned_graph, clusters = partition_graph(
+            joint_graph, n_entities, return_clusters=True)
+        # Infer predictions from clusters
+        result = analyzeClusters(clusters, eval_dictionary, eval_queries, k, debug_mode)
+        return result
+    
+    results = []
+    # Execute graph analysis in parallel
+    with Pool() as pool:
+        print(f"Partition/analyze: Using {pool._processes} processes")
+        results_gen = pool.imap_unordered(partition_analyze, [(joint_graphs[k], k) for k in joint_graphs])
+        for r in results_gen:
+            results.append(r)
     return results
 
 

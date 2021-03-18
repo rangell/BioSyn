@@ -108,12 +108,31 @@ def main(args):
                 break
             
             LOGGER.info("acc@{}={}".format(accuracy_level, result_evalset['acc' + str(accuracy_level)]))
-    
-    if args.save_predictions:
-        output_file = os.path.join(args.output_dir,f"{__import__('calendar').timegm(__import__('time').gmtime())}_predictions_eval.json")
-        with open(output_file, 'w') as f:
-            json.dump(result_evalset, f, indent=2)
-            print(f"\nPredictions saved at: {output_file}")
+        
+        if args.save_predictions:
+            output_file = os.path.join(args.output_dir,f"{__import__('calendar').timegm(__import__('time').gmtime())}_predictions_eval.json")
+            with open(output_file, 'w') as f:
+                json.dump(result_evalset, f, indent=2)
+                print(f"\nPredictions saved at: {output_file}")
+    else:
+        output_file_name = os.path.join(args.output_dir,f"{__import__('calendar').timegm(__import__('time').gmtime())}_predictions_eval")
+        result_overview = {
+            'n_entities': result_evalset[0]['n_entities'],
+            'n_mentions': result_evalset[0]['n_mentions']
+        }
+        for results in result_evalset:
+            k = results['k_candidates']
+            result_overview[f'accuracy@k{k}'] = results['accuracy']
+            LOGGER.info(f"accuracy@k{k} = {results['accuracy']}")
+            output_file = f'{output_file_name}-{k}.json'
+            if args.save_predictions:
+                with open(output_file, 'w') as f:
+                    json.dump(results, f, indent=2)
+                    print(f"\nPredictions @k{k} saved at: {output_file}")
+        if args.save_predictions:
+            with open(f'{output_file_name}.json', 'w') as f:
+                json.dump(result_overview, f, indent=2)
+                print(f"\nPredictions overview saved at: {output_file_name}.json")
 
 if __name__ == '__main__':
     args = parse_args()
