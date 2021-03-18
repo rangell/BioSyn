@@ -463,7 +463,6 @@ def partition_graph(graph, n_entities, return_clusters=False):
 
 def analyzeClusters(clusters, eval_dictionary, eval_queries, topk, debug_mode):
     # TODO: Add documentation
-
     n_entities = eval_dictionary.shape[0]
     n_mentions = eval_queries.shape[0]
 
@@ -537,15 +536,6 @@ def analyzeClusters(clusters, eval_dictionary, eval_queries, topk, debug_mode):
 
     return results
 
-# Parallelizable function to partition and analyze each graph
-def partition_analyze(args):
-    joint_graph, k, n_entities, eval_dictionary, eval_queries, debug_mode = args
-    # Partition graph based on cluster-linking constraints
-    partitioned_graph, clusters = partition_graph(
-        joint_graph, n_entities, return_clusters=True)
-    # Infer predictions from clusters
-    result = analyzeClusters(clusters, eval_dictionary, eval_queries, k, debug_mode)
-    return result
 
 def predict_topk_cluster_link(biosyn,
                               eval_dictionary,
@@ -645,12 +635,14 @@ def predict_topk_cluster_link(biosyn,
                 joint_graph['data'] = np.append(joint_graph['data'], men_cand_scores[:k])
     
     results = []
-    # Execute graph analysis in parallel
-    with Pool() as pool:
-        print(f"Partition/analyze: Using {pool._processes} processes")
-        results_gen = pool.imap_unordered(partition_analyze, [(joint_graphs[k], k, n_entities, eval_dictionary, eval_queries, debug_mode) for k in joint_graphs])
-        for r in results_gen:
-            results.append(r)
+    for k in joint_graphs:
+        # Partition graph based on cluster-linking constraints
+        partitioned_graph, clusters = partition_graph(
+            joint_graphs[k], n_entities, return_clusters=True)
+        # Infer predictions from clusters
+        result = analyzeClusters(clusters, eval_dictionary, eval_queries, k, debug_mode)
+        # Store result
+        results.append(result)
     return results
 
 
