@@ -646,7 +646,7 @@ def predict_topk_cluster_link(biosyn,
     # Execute graph analysis in parallel
     with Pool() as pool:
         print(f"Partition/analyze: Using {pool._processes} processes")
-        results_gen = pool.imap_unordered(partition_analyze, joint_graphs.values(), joint_graphs.keys(), [n_entities]*len(
+        results_gen = pool.imap_unordered(partition_analyze, list(joint_graphs.values()), list(joint_graphs.keys()), [n_entities]*len(
             joint_graphs), [eval_dictionary]*len(joint_graphs), [eval_queries]*len(joint_graphs), [debug_mode]*len(joint_graphs))
         for r in results_gen:
             results.append(r)
