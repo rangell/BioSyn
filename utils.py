@@ -537,7 +537,8 @@ def analyzeClusters(clusters, eval_dictionary, eval_queries, topk, debug_mode):
     return results
 
 # Parallelizable function to partition and analyze each graph
-def partition_analyze(joint_graph, k, n_entities, eval_dictionary, eval_queries, debug_mode):
+def partition_analyze(args):
+    joint_graph, k, n_entities, eval_dictionary, eval_queries, debug_mode = *args
     # Partition graph based on cluster-linking constraints
     partitioned_graph, clusters = partition_graph(
         joint_graph, n_entities, return_clusters=True)
@@ -646,8 +647,7 @@ def predict_topk_cluster_link(biosyn,
     # Execute graph analysis in parallel
     with Pool() as pool:
         print(f"Partition/analyze: Using {pool._processes} processes")
-        results_gen = pool.imap_unordered(partition_analyze, list(joint_graphs.values()), list(joint_graphs.keys()), [n_entities]*len(
-            joint_graphs), [eval_dictionary]*len(joint_graphs), [eval_queries]*len(joint_graphs), [debug_mode]*len(joint_graphs))
+        results_gen = pool.imap_unordered(partition_analyze, [(joint_graph[k], k, n_entities, eval_dictionary, eval_queries, debug_mode) for k in joint_graphs])
         for r in results_gen:
             results.append(r)
     return results
