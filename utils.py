@@ -465,6 +465,7 @@ def analyzeClusters(clusters, eval_dictionary, eval_queries, topk, debug_mode):
     # TODO: Add documentation
 
     n_entities = eval_dictionary.shape[0]
+    n_mentions = eval_queries.shape[0]
 
     results = {
         'n_entities': n_entities,
