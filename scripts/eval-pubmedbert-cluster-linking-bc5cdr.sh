@@ -17,7 +17,7 @@ python eval.py \
     --output_dir ${OUTPUT_DIR} \
     --use_cluster_linking \
     --use_cuda \
-    --topk 8 \
+    --topk 16 \
     --max_length 25 \
     --save_predictions
     #--debug_mode
