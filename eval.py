@@ -92,6 +92,7 @@ def main(args):
         eval_dictionary=eval_dictionary,
         eval_queries=eval_queries,
         topk=args.topk,
+        output_dir=args.output_dir,
         score_mode=args.score_mode,
         type_given=args.type_given,
         use_cluster_linking=args.use_cluster_linking,
