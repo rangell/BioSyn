@@ -401,9 +401,9 @@ def partition_graph(graph, n_entities, return_clusters=False):
         (optional) contains arrays of connected component indices of the graph
     """
     # Make the graph symmetric - needed for cluster inference after partitioning
-    _row = np.concatenate((graph['rows'], graph['cols']))
-    _col = np.concatenate((graph['cols'], graph['rows']))
-    _data = np.concatenate((graph['data'], graph['data']))
+    # _row = np.concatenate((graph['rows'], graph['cols']))
+    # _col = np.concatenate((graph['cols'], graph['rows']))
+    # _data = np.concatenate((graph['data'], graph['data']))
     
     # Filter duplicates
     seen = set()
