@@ -404,6 +404,9 @@ def partition_graph(graph, n_entities, return_clusters=False):
     # _row = np.concatenate((graph['rows'], graph['cols']))
     # _col = np.concatenate((graph['cols'], graph['rows']))
     # _data = np.concatenate((graph['data'], graph['data']))
+    _row = graph['rows']
+    _col = graph['cols']
+    _data = graph['data']
     
     # Filter duplicates
     seen = set()
