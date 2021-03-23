@@ -40,27 +40,19 @@ def _build_adj_index(np.ndarray[INT_t, ndim=1] values,
 def _has_entity_in_component(list stack,
                              np.ndarray[INT_t, ndim=1] to_vertices,
                              np.ndarray[INT_t, ndim=2] adj_index,
-                             INT_t num_entities,
-                             INT_t original_to_node,
-                             bint debug):
+                             INT_t num_entities):
     # performs DFS and returns `True` whenever it hits an entity
     cdef set visited = set()
     cdef bint found = False
     cdef INT_t curr_node
-    cdef INT_t original_node = stack[len(stack) - 1]
     while len(stack) > 0:
         # pop
         curr_node = stack[len(stack) - 1]
         stack = stack[:len(stack) - 1]
-        if debug:
-            print(curr_node)
-            print(stack)
 
         # check if `curr_node` is an entity
         if curr_node < num_entities:
             found = True
-            # if original_to_node < num_entities:
-                # print(f"Found: {original_node} can reach {curr_node}. Dropping {original_to_node}")
             break
 
         # check if we've visited `curr_node`
@@ -70,9 +62,6 @@ def _has_entity_in_component(list stack,
 
         # get neighbors of `curr_node` and push them onto the stack
         start_idx, end_idx = adj_index[curr_node, 0], adj_index[curr_node, 1]
-        if debug:
-            print(f"start_idx={start_idx}, end_idx={end_idx}")
-            print(to_vertices[start_idx:end_idx].tolist())
         stack.extend(to_vertices[start_idx:end_idx].tolist())
 
     return found
@@ -91,7 +80,7 @@ def special_partition(np.ndarray[INT_t, ndim=1] row,
     cdef np.ndarray[BOOL_t, ndim=1] keep_mask = np.ones([num_edges,], dtype=BOOL)
     cdef np.ndarray[INT_t, ndim=1] tmp_col
     cdef INT_t r, c
-    cdef bint entity_reachable, can_now_reach
+    cdef bint entity_reachable
     cdef INT_t row_max_value = row[len(row) - 1]
 
     # has shape [N, 2]; [:,0] are starting indices and [:,1] are (exclusive) ending indices
@@ -104,47 +93,24 @@ def special_partition(np.ndarray[INT_t, ndim=1] row,
         r = row[i]
         c = col[i]
 
-        assert r >= num_entities
-
-        # Check if entity is reachable to begin with
-        entity_reachable = _has_entity_in_component(
-            [r], col[keep_mask], row_wise_adj_index, num_entities, c, False)
-        if not entity_reachable:
-            print(r, c, keep_mask[i])
-            print(col[row_wise_adj_index[r,0]:row_wise_adj_index[r,1]])
-            _has_entity_in_component(
-                [r], col[keep_mask], row_wise_adj_index, num_entities, c, True)
-            assert entity_reachable
-
-
-        # try removing both the forward and backward edges
+        # try removing the edge
         keep_mask[i] = False
 
-        # update the adj list index for the forward and backward edges
-        # col_wise_adj_index[c:, :] -= 1
-        # col_wise_adj_index[c, 0] += 1
+        # update the adj list index
         row_wise_adj_index[r:, :] -= 1
         row_wise_adj_index[r, 0] += 1
 
         # create the temporary graph we want to check
-        # tmp_row = row[keep_mask]
         tmp_col = col[keep_mask]
 
         # check if we can remove the edge (r, c) 
-        # if c < num_entities:
-            # print(f"Checking if {r},{c} can be dropped")
         entity_reachable = _has_entity_in_component(
             [r], tmp_col, row_wise_adj_index, num_entities, c, False)
 
         # add the edge back if we need it
         if not entity_reachable:
-            # print("Not found")
             keep_mask[i] = True
             row_wise_adj_index[r:, :] += 1
             row_wise_adj_index[r, 0] -= 1
-            # Check if entity is now reachable
-            can_now_reach = _has_entity_in_component(
-                [r], col[keep_mask], row_wise_adj_index, num_entities, c, False)
-            assert can_now_reach
 
     return keep_mask

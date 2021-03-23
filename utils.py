@@ -375,10 +375,11 @@ def get_query_nn(biosyn,
     else:
         raise ValueError()
 
-    # Return the topk neighbours
-    
+    # Sort the candidates by descending order of scores
     cand_idxs, scores = zip(
         *sorted(zip(cand_idxs, scores), key=lambda x: -x[1]))
+    
+    # Return the topk neighbours
     return np.array(cand_idxs[:topk]), np.array(scores[:topk])
 
 
@@ -423,11 +424,6 @@ def partition_graph(graph, n_entities, return_clusters=False):
     special_row = np.asarray(special_row, dtype=np.int)
     special_col = np.asarray(special_col, dtype=np.int)
     special_data = np.asarray(special_data)
-
-    # Construct the coo matrix
-    # graph = coo_matrix(
-    #     (special_data, (special_row, special_col)),
-    #     shape=graph['shape'])
 
     # Order the edges in ascending order of similarity scores
     ordered_edge_indices = np.argsort(special_data)
@@ -495,7 +491,8 @@ def analyzeClusters(clusters, eval_dictionary, eval_queries, topk, debug_mode):
     }
     _debug_n_mens_evaluated, _debug_clusters_wo_entities, _debug_clusters_w_mult_entities = 0, 0, 0
 
-    for cluster in tqdm(clusters.values()):
+    print("Analyzing clusters")
+    for cluster in clusters.values():
         # The lowest value in the cluster should always be the entity
         pred_entity_idx = cluster[0]
         # Track the graph index of the entity in the cluster
@@ -503,8 +500,6 @@ def analyzeClusters(clusters, eval_dictionary, eval_queries, topk, debug_mode):
         if pred_entity_idx >= n_entities:
             # If the first element is a mention, then the cluster does not have an entity
             _debug_clusters_wo_entities += 1
-            print('debug: without entities')
-            embed()
             continue
         pred_entity = eval_dictionary[pred_entity_idx]
         pred_entity_cuis = pred_entity[2].replace('+', '|').split('|')
@@ -513,8 +508,6 @@ def analyzeClusters(clusters, eval_dictionary, eval_queries, topk, debug_mode):
             men_idx = cluster[i] - n_entities
             if men_idx < 0:
                 # If elements after the first are entities, then the cluster has multiple entities
-                print('debug: mutliple entities')
-                embed()
                 if not _debug_tracked_mult_entities:
                     _debug_clusters_w_mult_entities += 1
                     _debug_tracked_mult_entities = True
@@ -553,10 +546,9 @@ def analyzeClusters(clusters, eval_dictionary, eval_queries, topk, debug_mode):
         results['n_clusters_w_mult_entities'] = _debug_clusters_w_mult_entities
     else:
         # Run sanity checks
-        print(n_mentions == _debug_n_mens_evaluated, _debug_clusters_wo_entities == 0, _debug_clusters_w_mult_entities == 0)
-        if not(n_mentions == _debug_n_mens_evaluated and _debug_clusters_wo_entities == 0 and _debug_clusters_w_mult_entities == 0):
-            print("debug: sanity")
-            embed()
+        assert n_mentions == _debug_n_mens_evaluated
+        assert _debug_clusters_wo_entities == 0
+        assert _debug_clusters_w_mult_entities == 0
 
     return results
 
@@ -601,12 +593,13 @@ def predict_topk_cluster_link(biosyn,
     n_mentions = eval_queries.shape[0]
 
     # Values of k to run the evaluation against
-    topk_vals = [0, *[2**i for i in range(int(math.log(topk, 2)) + 1)]]
+    topk_vals = [0] + [2**i for i in range(int(math.log(topk, 2)) + 1)]
     # Store the maximum evaluation k
     topk = topk_vals[-1]
 
     # Check if graphs are already built
     if __import__('os').path.isfile(f'{output_dir}/graphs.pickle'):
+        print("Loading stored joint graphs")
         with open(f'{output_dir}/graphs.pickle', 'rb') as read_handle:
             joint_graphs = pickle.load(read_handle)
     else:
@@ -622,15 +615,17 @@ def predict_topk_cluster_link(biosyn,
             }
 
         # Embed entity dictionary and build indexes
+        print("Dictionary: Embedding and building indexes")
         dict_sparse_embeds, dict_dense_embeds, dict_sparse_index, dict_dense_index = embed_and_index(
             biosyn, eval_dictionary[:, 0])
 
         # Embed mention queries and build indexes
+        print("Queries: Embedding and building indexes")
         men_sparse_embeds, men_dense_embeds, men_sparse_index, men_dense_index = embed_and_index(
             biosyn, eval_queries[:, 0])
 
         # Find the most similar entity and topk mentions for each mention query
-        for eval_query_idx, eval_query in enumerate(tqdm(eval_queries, total=len(eval_queries))):
+        for eval_query_idx, eval_query in enumerate(tqdm(eval_queries, total=len(eval_queries), desc="Fetching k-NN")):
             men_sparse_embed = men_sparse_embeds[eval_query_idx:eval_query_idx+1] # Slicing to get a 2-D array
             men_dense_embed = men_dense_embeds[eval_query_idx:eval_query_idx+1]
 
@@ -672,6 +667,7 @@ def predict_topk_cluster_link(biosyn,
 
     results = []
     for k in joint_graphs:
+        print(f"Graph (k={k}):")
         # Partition graph based on cluster-linking constraints
         partitioned_graph, clusters = partition_graph(
             joint_graphs[k], n_entities, return_clusters=True)
