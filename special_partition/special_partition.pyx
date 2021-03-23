@@ -70,6 +70,9 @@ def _has_entity_in_component(list stack,
 
         # get neighbors of `curr_node` and push them onto the stack
         start_idx, end_idx = adj_index[curr_node, 0], adj_index[curr_node, 1]
+        if debug:
+            print(f"start_idx={start_idx}, end_idx={end_idx}")
+            print(to_vertices[start_idx:end_idx].tolist())
         stack.extend(to_vertices[start_idx:end_idx].tolist())
 
     return found
