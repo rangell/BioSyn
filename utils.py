@@ -401,45 +401,48 @@ def partition_graph(graph, n_entities, return_clusters=False):
     clusters : dict
         (optional) contains arrays of connected component indices of the graph
     """
-    _row = graph['rows']
-    _col = graph['cols']
-    _data = graph['data']
+    # _row = graph['rows']
+    # _col = graph['cols']
+    # _data = graph['data']
     
-    # Filter duplicates
-    seen = set()
-    _f_row, _f_col, _f_data = [], [], []
-    for k, _ in enumerate(_row):
-        if (_row[k], _col[k]) in seen:
-            continue
-        seen.add((_row[k], _col[k]))
-        _f_row.append(_row[k])
-        _f_col.append(_col[k])
-        _f_data.append(_data[k])
-    _row, _col, _data = list(map(np.array, (_f_row, _f_col, _f_data)))
+    # # Filter duplicates
+    # seen = set()
+    # _f_row, _f_col, _f_data = [], [], []
+    # for k, _ in enumerate(_row):
+    #     if (_row[k], _col[k]) in seen:
+    #         continue
+    #     seen.add((_row[k], _col[k]))
+    #     _f_row.append(_row[k])
+    #     _f_col.append(_col[k])
+    #     _f_data.append(_data[k])
+    # _row, _col, _data = list(map(np.array, (_f_row, _f_col, _f_data)))
 
-    # Sort data for efficient DFS
-    tuples = zip(_row, _col, _data)
-    tuples = sorted(tuples, key=lambda x: (x[0], -x[1]))
-    special_row, special_col, special_data = zip(*tuples)
-    special_row = np.asarray(special_row, dtype=np.int)
-    special_col = np.asarray(special_col, dtype=np.int)
-    special_data = np.asarray(special_data)
+    # # Sort data for efficient DFS
+    # tuples = zip(_row, _col, _data)
+    # tuples = sorted(tuples, key=lambda x: (x[0], -x[1]))
+    # special_row, special_col, special_data = zip(*tuples)
+    # special_row = np.asarray(special_row, dtype=np.int)
+    # special_col = np.asarray(special_col, dtype=np.int)
+    # special_data = np.asarray(special_data)
 
-    # Order the edges in ascending order of similarity scores
-    ordered_edge_indices = np.argsort(special_data)
+    # # Order the edges in ascending order of similarity scores
+    # ordered_edge_indices = np.argsort(special_data)
 
-    # Determine which edges to keep in the partitioned graph
-    keep_edge_mask = special_partition(
-        special_row,
-        special_col,
-        ordered_edge_indices,
-        n_entities)
-
+    # # Determine which edges to keep in the partitioned graph
+    # keep_edge_mask = special_partition(
+    #     special_row,
+    #     special_col,
+    #     ordered_edge_indices,
+    #     n_entities)
+    rows, cols, data = cluster_linking_partition(
+        graph['rows'],
+        graph['cols'],
+        graph['data'],
+        n_entities
+    )
     # Construct the partitioned graph
     partitioned_graph = coo_matrix(
-        (special_data[keep_edge_mask],
-        (special_row[keep_edge_mask], special_col[keep_edge_mask])),
-        shape=graph['shape'])
+        (data, (rows, cols)), shape=graph['shape'])
     
     if return_clusters:
         # Get an array with each graph index marked with the component label that it is connected to

@@ -114,3 +114,40 @@ def special_partition(np.ndarray[INT_t, ndim=1] row,
             row_wise_adj_index[r, 0] -= 1
 
     return keep_mask
+
+def cluster_linking_partition(_row, _col, _data, n_entities):
+    _row = graph['rows']
+    _col = graph['cols']
+    _data = graph['data']
+    
+    # Filter duplicates
+    seen = set()
+    _f_row, _f_col, _f_data = [], [], []
+    for k, _ in enumerate(_row):
+        if (_row[k], _col[k]) in seen:
+            continue
+        seen.add((_row[k], _col[k]))
+        _f_row.append(_row[k])
+        _f_col.append(_col[k])
+        _f_data.append(_data[k])
+    _row, _col, _data = list(map(np.array, (_f_row, _f_col, _f_data)))
+
+    # Sort data for efficient DFS
+    tuples = zip(_row, _col, _data)
+    tuples = sorted(tuples, key=lambda x: (x[0], -x[1]))
+    special_row, special_col, special_data = zip(*tuples)
+    special_row = np.asarray(special_row, dtype=np.int)
+    special_col = np.asarray(special_col, dtype=np.int)
+    special_data = np.asarray(special_data)
+
+    # Order the edges in ascending order of similarity scores
+    ordered_edge_indices = np.argsort(special_data)
+
+    # Determine which edges to keep in the partitioned graph
+    cdef np.ndarray[BOOL_t, ndim=1] keep_edge_mask = special_partition(
+        special_row,
+        special_col,
+        ordered_edge_indices,
+        n_entities)
+
+    return special_row[keep_edge_mask], special_col[keep_edge_mask], special_data[keep_edge_mask]
