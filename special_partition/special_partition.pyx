@@ -35,7 +35,7 @@ def _build_adj_index(np.ndarray[INT_t, ndim=1] values,
 
     return adj_index
 
-
+@cython.wraparound(False)
 @cython.boundscheck(False)
 def _has_entity_in_component(list stack,
                              np.ndarray[INT_t, ndim=1] to_vertices,
@@ -45,11 +45,11 @@ def _has_entity_in_component(list stack,
     cdef set visited = set()
     cdef bint found = False
     cdef INT_t curr_node
-    cdef INT_t original_node = stack[-1]
+    cdef INT_t original_node = stack[len(stack) - 1]
     while len(stack) > 0:
         # pop
-        curr_node = stack[-1]
-        stack = stack[:-1]
+        curr_node = stack[len(stack) - 1]
+        stack = stack[:len(stack) - 1]
 
         # check if `curr_node` is an entity
         if curr_node < num_entities:
