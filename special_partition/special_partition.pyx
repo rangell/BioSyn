@@ -116,8 +116,7 @@ def special_partition(np.ndarray[INT_t, ndim=1] row,
         # if c < num_entities:
             # print(f"Checking if {r},{c} can be dropped")
         entity_reachable = _has_entity_in_component(
-                [r], tmp_col, row_wise_adj_index, num_entities, c
-        )
+            [r], tmp_col, row_wise_adj_index, num_entities, c)
 
         # add the edge back if we need it
         if not entity_reachable:
@@ -127,6 +126,6 @@ def special_partition(np.ndarray[INT_t, ndim=1] row,
             row_wise_adj_index[r, 0] -= 1
             # Check if entity is now reachable
             assert _has_entity_in_component(
-                [r], col[keep_mask], row_wise_adj_index, num_entities, c
+                [r], col[keep_mask], row_wise_adj_index, num_entities, c)
 
     return keep_mask
