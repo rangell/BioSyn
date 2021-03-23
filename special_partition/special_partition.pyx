@@ -74,11 +74,9 @@ def _has_entity_in_component(list stack,
 def special_partition(np.ndarray[INT_t, ndim=1] row, 
                       np.ndarray[INT_t, ndim=1] col,
                       np.ndarray[INT_t, ndim=1] ordered_indices,
-                      np.ndarray[INT_t, ndim=1] siamese_indices,
                       INT_t num_entities):
     assert row.shape[0] == col.shape[0]
     assert row.shape[0] == ordered_indices.shape[0]
-    assert row.shape[0] == siamese_indices.shape[0]
 
     cdef INT_t num_edges = row.shape[0]
     cdef np.ndarray[BOOL_t, ndim=1] keep_mask = np.ones([num_edges,], dtype=BOOL)
@@ -104,7 +102,6 @@ def special_partition(np.ndarray[INT_t, ndim=1] row,
 
         # try removing both the forward and backward edges
         keep_mask[i] = False
-        keep_mask[siamese_indices[i]] = False
 
         # update the adj list index for the forward and backward edges
         col_wise_adj_index[c:, :] -= 1
@@ -126,7 +123,6 @@ def special_partition(np.ndarray[INT_t, ndim=1] row,
         # add the edge back if we need it
         if not(has_entity_r and has_entity_c):
             keep_mask[i] = True
-            keep_mask[siamese_indices[i]] = True
             col_wise_adj_index[c:, :] += 1
             col_wise_adj_index[c, 0] -= 1
             col_wise_adj_index[r:, :] += 1

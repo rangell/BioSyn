@@ -400,10 +400,6 @@ def partition_graph(graph, n_entities, return_clusters=False):
     clusters : dict
         (optional) contains arrays of connected component indices of the graph
     """
-    # Make the graph symmetric - needed for cluster inference after partitioning
-    # _row = np.concatenate((graph['rows'], graph['cols']))
-    # _col = np.concatenate((graph['cols'], graph['rows']))
-    # _data = np.concatenate((graph['data'], graph['data']))
     _row = graph['rows']
     _col = graph['cols']
     _data = graph['data']
@@ -433,12 +429,6 @@ def partition_graph(graph, n_entities, return_clusters=False):
         (special_data, (special_row, special_col)),
         shape=graph['shape'])
 
-    # Create siamese indices for simple lookup during partitioning
-    edge_indices = {e: i for i, e in enumerate(zip(special_row, special_col))}
-    siamese_indices = [edge_indices[(c, r)]
-                       for r, c in zip(special_row, special_col)]
-    siamese_indices = np.asarray(siamese_indices)
-
     # Order the edges in ascending order of similarity scores
     ordered_edge_indices = np.argsort(special_data)
 
@@ -447,7 +437,6 @@ def partition_graph(graph, n_entities, return_clusters=False):
         special_row,
         special_col,
         ordered_edge_indices,
-        siamese_indices,
         n_entities)
 
     # Construct the partitioned graph
