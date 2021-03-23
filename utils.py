@@ -8,7 +8,7 @@ import faiss
 import nmslib
 from scipy.sparse import coo_matrix
 from scipy.sparse.csgraph import connected_components
-from special_partition.special_partition import special_partition
+from special_partition.special_partition import cluster_linking_partition
 from collections import defaultdict
 import pickle
 
