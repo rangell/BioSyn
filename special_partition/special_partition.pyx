@@ -5,6 +5,8 @@ import cython
 import numpy as np
 cimport numpy as np
 from tqdm import tqdm
+from IPython import embed
+
 
 INT = np.int
 BOOL = np.bool
@@ -106,8 +108,6 @@ def special_partition(np.ndarray[INT_t, ndim=1] row,
         # update the adj list index for the forward and backward edges
         col_wise_adj_index[c:, :] -= 1
         col_wise_adj_index[c, 0] += 1
-        col_wise_adj_index[r:, :] -= 1
-        col_wise_adj_index[r, 0] += 1
 
         # create the temporary graph we want to check
         tmp_row = row[keep_mask]
@@ -116,16 +116,11 @@ def special_partition(np.ndarray[INT_t, ndim=1] row,
         has_entity_r = _has_entity_in_component(
                 [r], tmp_row, col_wise_adj_index, num_entities
         )
-        has_entity_c = _has_entity_in_component(
-                [c], tmp_row, col_wise_adj_index, num_entities
-        )
 
         # add the edge back if we need it
-        if not(has_entity_r and has_entity_c):
+        if not has_entity_r:
             keep_mask[i] = True
             col_wise_adj_index[c:, :] += 1
             col_wise_adj_index[c, 0] -= 1
-            col_wise_adj_index[r:, :] += 1
-            col_wise_adj_index[r, 0] -= 1
 
     return keep_mask
