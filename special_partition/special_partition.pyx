@@ -104,6 +104,7 @@ def special_partition(np.ndarray[INT_t, ndim=1] row,
             [r], col[keep_mask], row_wise_adj_index, num_entities, c)
         if not entity_reachable:
             print(r, c, keep_mask[i])
+            print(col[row_wise_adj_index[r,0]:row_wise_adj_index[r,1]])
             assert entity_reachable
 
 
