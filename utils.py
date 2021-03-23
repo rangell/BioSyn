@@ -418,16 +418,16 @@ def partition_graph(graph, n_entities, return_clusters=False):
 
     # Sort data for efficient DFS
     tuples = zip(_row, _col, _data)
-    tuples = sorted(tuples, key=lambda x: (x[0], x[1]))
+    tuples = sorted(tuples, key=lambda x: (x[0], -x[1]))
     special_row, special_col, special_data = zip(*tuples)
     special_row = np.asarray(special_row, dtype=np.int)
     special_col = np.asarray(special_col, dtype=np.int)
     special_data = np.asarray(special_data)
 
     # Construct the coo matrix
-    graph = coo_matrix(
-        (special_data, (special_row, special_col)),
-        shape=graph['shape'])
+    # graph = coo_matrix(
+    #     (special_data, (special_row, special_col)),
+    #     shape=graph['shape'])
 
     # Order the edges in ascending order of similarity scores
     ordered_edge_indices = np.argsort(special_data)
@@ -443,7 +443,7 @@ def partition_graph(graph, n_entities, return_clusters=False):
     partitioned_graph = coo_matrix(
         (special_data[keep_edge_mask],
         (special_row[keep_edge_mask], special_col[keep_edge_mask])),
-        shape=graph.shape)
+        shape=graph['shape'])
     
     if return_clusters:
         # Get an array with each graph index marked with the component label that it is connected to

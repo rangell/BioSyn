@@ -43,8 +43,9 @@ def _has_entity_in_component(list stack,
                              INT_t num_entities):
     # performs DFS and returns `True` whenever it hits an entity
     cdef set visited = set()
+    cdef bint found = False
     cdef INT_t curr_node
-
+    cdef INT_t original_node = stack[-1]
     while len(stack) > 0:
         # pop
         curr_node = stack[-1]
@@ -52,7 +53,9 @@ def _has_entity_in_component(list stack,
 
         # check if `curr_node` is an entity
         if curr_node < num_entities:
-            return True
+            found = True
+            print(f"Found: {original_node} can reach {curr_node}")
+            break
 
         # check if we've visited `curr_node`
         if curr_node in visited:
@@ -61,9 +64,9 @@ def _has_entity_in_component(list stack,
 
         # get neighbors of `curr_node` and push them onto the stack
         start_idx, end_idx = adj_index[curr_node, 0], adj_index[curr_node, 1]
-        stack.extend(to_vertices[start_idx:end_idx][::-1].tolist())
-    
-    return False
+        stack.extend(to_vertices[start_idx:end_idx].tolist())
+
+    return found
 
 
 @cython.boundscheck(False)
@@ -92,10 +95,6 @@ def special_partition(np.ndarray[INT_t, ndim=1] row,
         r = row[i]
         c = col[i]
 
-        # we've already deleted this edge so we can move on
-        if keep_mask[i] == False:
-            continue
-
         # try removing both the forward and backward edges
         keep_mask[i] = False
 
@@ -110,6 +109,7 @@ def special_partition(np.ndarray[INT_t, ndim=1] row,
         tmp_col = col[keep_mask]
 
         # check if we can remove the edge (r, c) 
+        print(f"Checking if {r},{c} can be dropped")
         entity_reachable = _has_entity_in_component(
                 [r], tmp_col, row_wise_adj_index, num_entities
         )
