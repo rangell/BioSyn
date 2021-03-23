@@ -116,10 +116,6 @@ def special_partition(np.ndarray[INT_t, ndim=1] row,
     return keep_mask
 
 def cluster_linking_partition(_row, _col, _data, n_entities):
-    _row = graph['rows']
-    _col = graph['cols']
-    _data = graph['data']
-    
     # Filter duplicates
     seen = set()
     _f_row, _f_col, _f_data = [], [], []
