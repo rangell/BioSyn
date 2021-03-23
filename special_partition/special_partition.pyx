@@ -102,9 +102,11 @@ def special_partition(np.ndarray[INT_t, ndim=1] row,
         # Check if entity is reachable to begin with
         entity_reachable = _has_entity_in_component(
             [r], col[keep_mask], row_wise_adj_index, num_entities, c)
-        assert entity_reachable
+        if not entity_reachable:
+            print(r, c, keep_mask[i])
+            assert entity_reachable
 
-        
+
         # try removing both the forward and backward edges
         keep_mask[i] = False
 
