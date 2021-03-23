@@ -449,7 +449,7 @@ def partition_graph(graph, n_entities, return_clusters=False):
         # Get an array with each graph index marked with the component label that it is connected to
         _, cc_labels = connected_components(
             csgraph=partitioned_graph,
-            directed=False,
+            directed=True,
             return_labels=True)
         # Store clusters of indices marked with labels with at least 2 connected components
         unique_cc_labels, cc_sizes = np.unique(cc_labels, return_counts=True)
