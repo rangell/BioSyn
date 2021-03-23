@@ -503,6 +503,8 @@ def analyzeClusters(clusters, eval_dictionary, eval_queries, topk, debug_mode):
         if pred_entity_idx >= n_entities:
             # If the first element is a mention, then the cluster does not have an entity
             _debug_clusters_wo_entities += 1
+            print('debug: without entities')
+            embed()
             continue
         pred_entity = eval_dictionary[pred_entity_idx]
         pred_entity_cuis = pred_entity[2].replace('+', '|').split('|')
@@ -511,6 +513,8 @@ def analyzeClusters(clusters, eval_dictionary, eval_queries, topk, debug_mode):
             men_idx = cluster[i] - n_entities
             if men_idx < 0:
                 # If elements after the first are entities, then the cluster has multiple entities
+                print('debug: mutliple entities')
+                embed()
                 if not _debug_tracked_mult_entities:
                     _debug_clusters_w_mult_entities += 1
                     _debug_tracked_mult_entities = True
@@ -551,6 +555,7 @@ def analyzeClusters(clusters, eval_dictionary, eval_queries, topk, debug_mode):
         # Run sanity checks
         print(n_mentions == _debug_n_mens_evaluated, _debug_clusters_wo_entities == 0, _debug_clusters_w_mult_entities == 0)
         if not(n_mentions == _debug_n_mens_evaluated and _debug_clusters_wo_entities == 0 and _debug_clusters_w_mult_entities == 0):
+            print("debug: sanity")
             embed()
 
     return results
