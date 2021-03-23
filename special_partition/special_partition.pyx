@@ -42,7 +42,7 @@ def _has_entity_in_component(list stack,
                              np.ndarray[INT_t, ndim=2] adj_index,
                              INT_t num_entities,
                              INT_t original_to_node,
-                             bint debug = False):
+                             bint debug):
     # performs DFS and returns `True` whenever it hits an entity
     cdef set visited = set()
     cdef bint found = False
@@ -105,7 +105,7 @@ def special_partition(np.ndarray[INT_t, ndim=1] row,
 
         # Check if entity is reachable to begin with
         entity_reachable = _has_entity_in_component(
-            [r], col[keep_mask], row_wise_adj_index, num_entities, c)
+            [r], col[keep_mask], row_wise_adj_index, num_entities, c, False)
         if not entity_reachable:
             print(r, c, keep_mask[i])
             print(col[row_wise_adj_index[r,0]:row_wise_adj_index[r,1]])
@@ -131,7 +131,7 @@ def special_partition(np.ndarray[INT_t, ndim=1] row,
         # if c < num_entities:
             # print(f"Checking if {r},{c} can be dropped")
         entity_reachable = _has_entity_in_component(
-            [r], tmp_col, row_wise_adj_index, num_entities, c)
+            [r], tmp_col, row_wise_adj_index, num_entities, c, False)
 
         # add the edge back if we need it
         if not entity_reachable:
@@ -141,7 +141,7 @@ def special_partition(np.ndarray[INT_t, ndim=1] row,
             row_wise_adj_index[r, 0] -= 1
             # Check if entity is now reachable
             can_now_reach = _has_entity_in_component(
-                [r], col[keep_mask], row_wise_adj_index, num_entities, c)
+                [r], col[keep_mask], row_wise_adj_index, num_entities, c, False)
             assert can_now_reach
 
     return keep_mask
