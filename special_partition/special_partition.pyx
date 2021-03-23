@@ -41,7 +41,8 @@ def _has_entity_in_component(list stack,
                              np.ndarray[INT_t, ndim=1] to_vertices,
                              np.ndarray[INT_t, ndim=2] adj_index,
                              INT_t num_entities,
-                             INT_t original_to_node):
+                             INT_t original_to_node,
+                             bint debug = False):
     # performs DFS and returns `True` whenever it hits an entity
     cdef set visited = set()
     cdef bint found = False
@@ -51,6 +52,9 @@ def _has_entity_in_component(list stack,
         # pop
         curr_node = stack[len(stack) - 1]
         stack = stack[:len(stack) - 1]
+        if debug:
+            print(curr)
+            print(stack)
 
         # check if `curr_node` is an entity
         if curr_node < num_entities:
@@ -105,6 +109,8 @@ def special_partition(np.ndarray[INT_t, ndim=1] row,
         if not entity_reachable:
             print(r, c, keep_mask[i])
             print(col[row_wise_adj_index[r,0]:row_wise_adj_index[r,1]])
+            _has_entity_in_component(
+                [r], col[keep_mask], row_wise_adj_index, num_entities, c, True)
             assert entity_reachable
 
 
