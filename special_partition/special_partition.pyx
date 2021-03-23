@@ -84,7 +84,7 @@ def special_partition(np.ndarray[INT_t, ndim=1] row,
     cdef np.ndarray[BOOL_t, ndim=1] keep_mask = np.ones([num_edges,], dtype=BOOL)
     cdef np.ndarray[INT_t, ndim=1] tmp_col
     cdef INT_t r, c
-    cdef bint entity_reachable
+    cdef bint entity_reachable, can_now_reach
     cdef INT_t row_max_value = row[-1]
 
     # has shape [N, 2]; [:,0] are starting indices and [:,1] are (exclusive) ending indices
@@ -125,7 +125,8 @@ def special_partition(np.ndarray[INT_t, ndim=1] row,
             row_wise_adj_index[r:, :] += 1
             row_wise_adj_index[r, 0] -= 1
             # Check if entity is now reachable
-            assert _has_entity_in_component(
+            can_now_reach = _has_entity_in_component(
                 [r], col[keep_mask], row_wise_adj_index, num_entities, c)
+            assert can_now_reach
 
     return keep_mask
