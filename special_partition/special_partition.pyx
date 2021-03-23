@@ -109,13 +109,15 @@ def special_partition(np.ndarray[INT_t, ndim=1] row,
         tmp_col = col[keep_mask]
 
         # check if we can remove the edge (r, c) 
-        print(f"Checking if {r},{c} can be dropped")
+        if c < num_entities:
+            print(f"Checking if {r},{c} can be dropped")
         entity_reachable = _has_entity_in_component(
                 [r], tmp_col, row_wise_adj_index, num_entities
         )
 
         # add the edge back if we need it
         if not entity_reachable:
+            print("Not found")
             keep_mask[i] = True
             row_wise_adj_index[r:, :] += 1
             row_wise_adj_index[r, 0] -= 1
