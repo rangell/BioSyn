@@ -92,7 +92,7 @@ def special_partition(np.ndarray[INT_t, ndim=1] row,
     cdef np.ndarray[INT_t, ndim=1] tmp_col
     cdef INT_t r, c
     cdef bint entity_reachable, can_now_reach
-    cdef INT_t row_max_value = row[-1]
+    cdef INT_t row_max_value = row[len(row) - 1]
 
     # has shape [N, 2]; [:,0] are starting indices and [:,1] are (exclusive) ending indices
     cdef np.ndarray[INT_t, ndim=2] row_wise_adj_index
