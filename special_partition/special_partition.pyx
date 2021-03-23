@@ -105,7 +105,7 @@ def special_partition(np.ndarray[INT_t, ndim=1] row,
 
         # check if we can remove the edge (r, c) 
         entity_reachable = _has_entity_in_component(
-            [r], tmp_col, row_wise_adj_index, num_entities, c, False)
+            [r], tmp_col, row_wise_adj_index, num_entities)
 
         # add the edge back if we need it
         if not entity_reachable:
