@@ -17,34 +17,32 @@ ctypedef np.npy_bool BOOL_t
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
-def _build_col_wise_adj_index(np.ndarray[INT_t, ndim=1] col,
-                              INT_t col_max_value):
-    # requires: sorted col ascending order
-    cdef INT_t index_size = col_max_value + 1
-    cdef np.ndarray[INT_t, ndim=2] col_wise_adj_index = np.zeros([index_size, 2], dtype=INT)
-    cdef INT_t adjusted_index
+def _build_adj_index(np.ndarray[INT_t, ndim=1] values,
+                              INT_t max_value):
+    # requires: values in ascending order
+    cdef INT_t index_size = max_value + 1
+    cdef np.ndarray[INT_t, ndim=2] adj_index = np.zeros([index_size, 2], dtype=INT)
     cdef INT_t i = 0, c
 
-    cdef INT_t curr_col = col[0]
-    for i, c in enumerate(col):
+    cdef INT_t curr_col = values[0]
+    for i, c in enumerate(values):
         if c != curr_col:
             curr_col = c
-            col_wise_adj_index[curr_col, 0] = i
-            col_wise_adj_index[curr_col, 1] = i+1
+            adj_index[curr_col, 0] = i
+            adj_index[curr_col, 1] = i+1
         else:
-            col_wise_adj_index[curr_col, 1] += 1
+            adj_index[curr_col, 1] += 1
 
-    return col_wise_adj_index
+    return adj_index
 
 
 @cython.boundscheck(False)
 def _has_entity_in_component(list stack,
-                             np.ndarray[INT_t, ndim=1] row,
-                             np.ndarray[INT_t, ndim=2] col_wise_adj_index,
+                             np.ndarray[INT_t, ndim=1] to_vertices,
+                             np.ndarray[INT_t, ndim=2] adj_index,
                              INT_t num_entities):
     # performs DFS and returns `True` whenever it hits an entity
     cdef bint has_entity = False
-    cdef INT_t index_size = col_wise_adj_index.shape[0]
     cdef set visited = set()
     cdef INT_t curr_node
 
@@ -64,9 +62,8 @@ def _has_entity_in_component(list stack,
         visited.add(curr_node)
 
         # get neighbors of `curr_node` and push them onto the stack
-        start_index = col_wise_adj_index[curr_node, 0]
-        end_index = col_wise_adj_index[curr_node, 1]
-        stack.extend(row[start_index:end_index].tolist())
+        start_idx, end_idx = adj_index[curr_node, 0], adj_index[curr_node, 1]
+        stack.extend(to_vertices[start_idx:end_idx].tolist())
     
     return has_entity
 
@@ -84,14 +81,13 @@ def special_partition(np.ndarray[INT_t, ndim=1] row,
     cdef np.ndarray[BOOL_t, ndim=1] keep_mask = np.ones([num_edges,], dtype=BOOL)
     cdef np.ndarray[INT_t, ndim=1] tmp_row, tmp_col
     cdef INT_t r, c
-    cdef bint has_entity_r, has_entity_c
-    cdef INT_t col_max_value = np.max(col)
+    cdef bint entity_reachable
+    cdef INT_t row_max_value = row[-1]
 
     # has shape [N, 2]; [:,0] are starting indices and [:,1] are (exclusive) ending indices
-    cdef np.ndarray[INT_t, ndim=2] col_wise_adj_index
-    cdef INT_t adjusted_index
-    col_wise_adj_index = _build_col_wise_adj_index(
-            col, col_max_value
+    cdef np.ndarray[INT_t, ndim=2] row_wise_adj_index
+    row_wise_adj_index = _build_adj_index(
+            row, row_max_value
     )
 
     for i in tqdm(ordered_indices, desc='Paritioning Joint Graph'):
@@ -106,21 +102,24 @@ def special_partition(np.ndarray[INT_t, ndim=1] row,
         keep_mask[i] = False
 
         # update the adj list index for the forward and backward edges
-        col_wise_adj_index[c:, :] -= 1
-        col_wise_adj_index[c, 0] += 1
+        # col_wise_adj_index[c:, :] -= 1
+        # col_wise_adj_index[c, 0] += 1
+        row_wise_adj_index[r:, :] -= 1
+        row_wise_adj_index[r, 0] += 1
 
         # create the temporary graph we want to check
-        tmp_row = row[keep_mask]
+        # tmp_row = row[keep_mask]
+        tmp_col = col[keep_mask]
 
         # check if we can remove the edge (r, c) 
-        has_entity_r = _has_entity_in_component(
-                [r], tmp_row, col_wise_adj_index, num_entities
+        entity_reachable = _has_entity_in_component(
+                [r], tmp_col, row_wise_adj_index, num_entities
         )
 
         # add the edge back if we need it
-        if not has_entity_r:
+        if not entity_reachable:
             keep_mask[i] = True
-            col_wise_adj_index[c:, :] += 1
-            col_wise_adj_index[c, 0] -= 1
+            row_wise_adj_index[r:, :] += 1
+            row_wise_adj_index[r, 0] -= 1
 
     return keep_mask

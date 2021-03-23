@@ -418,7 +418,7 @@ def partition_graph(graph, n_entities, return_clusters=False):
 
     # Sort data for efficient DFS
     tuples = zip(_row, _col, _data)
-    tuples = sorted(tuples, key=lambda x: (x[1], -x[0]))
+    tuples = sorted(tuples, key=lambda x: (x[0], x[1]))
     special_row, special_col, special_data = zip(*tuples)
     special_row = np.asarray(special_row, dtype=np.int)
     special_col = np.asarray(special_col, dtype=np.int)
