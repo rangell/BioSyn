@@ -550,7 +550,7 @@ def analyzeClusters(clusters, eval_dictionary, eval_queries, topk, debug_mode):
     else:
         # Run sanity checks
         print(n_mentions == _debug_n_mens_evaluated, _debug_clusters_wo_entities == 0, _debug_clusters_w_mult_entities == 0)
-        if not(n_mentions == _debug_n_mens_evaluated and _debug_clusters_wo_entities and 0 and _debug_clusters_w_mult_entities == 0):
+        if not(n_mentions == _debug_n_mens_evaluated and _debug_clusters_wo_entities == 0 and _debug_clusters_w_mult_entities == 0):
             embed()
 
     return results
