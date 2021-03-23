@@ -53,7 +53,7 @@ def _has_entity_in_component(list stack,
         curr_node = stack[len(stack) - 1]
         stack = stack[:len(stack) - 1]
         if debug:
-            print(curr)
+            print(curr_node)
             print(stack)
 
         # check if `curr_node` is an entity
