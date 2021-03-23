@@ -42,7 +42,6 @@ def _has_entity_in_component(list stack,
                              np.ndarray[INT_t, ndim=2] adj_index,
                              INT_t num_entities):
     # performs DFS and returns `True` whenever it hits an entity
-    cdef bint has_entity = False
     cdef set visited = set()
     cdef INT_t curr_node
 
@@ -53,8 +52,7 @@ def _has_entity_in_component(list stack,
 
         # check if `curr_node` is an entity
         if curr_node < num_entities:
-            has_entity = True
-            break
+            return True
 
         # check if we've visited `curr_node`
         if curr_node in visited:
@@ -63,9 +61,9 @@ def _has_entity_in_component(list stack,
 
         # get neighbors of `curr_node` and push them onto the stack
         start_idx, end_idx = adj_index[curr_node, 0], adj_index[curr_node, 1]
-        stack.extend(to_vertices[start_idx:end_idx].tolist())
+        stack.extend(to_vertices[start_idx:end_idx][::-1].tolist())
     
-    return has_entity
+    return False
 
 
 @cython.boundscheck(False)
@@ -79,7 +77,7 @@ def special_partition(np.ndarray[INT_t, ndim=1] row,
 
     cdef INT_t num_edges = row.shape[0]
     cdef np.ndarray[BOOL_t, ndim=1] keep_mask = np.ones([num_edges,], dtype=BOOL)
-    cdef np.ndarray[INT_t, ndim=1] tmp_row, tmp_col
+    cdef np.ndarray[INT_t, ndim=1] tmp_col
     cdef INT_t r, c
     cdef bint entity_reachable
     cdef INT_t row_max_value = row[-1]
