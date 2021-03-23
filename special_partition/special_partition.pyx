@@ -55,8 +55,8 @@ def _has_entity_in_component(list stack,
         # check if `curr_node` is an entity
         if curr_node < num_entities:
             found = True
-            if original_to_node < num_entities:
-                print(f"Found: {original_node} can reach {curr_node}. Dropping {original_to_node}")
+            # if original_to_node < num_entities:
+                # print(f"Found: {original_node} can reach {curr_node}. Dropping {original_to_node}")
             break
 
         # check if we've visited `curr_node`
@@ -113,17 +113,20 @@ def special_partition(np.ndarray[INT_t, ndim=1] row,
         tmp_col = col[keep_mask]
 
         # check if we can remove the edge (r, c) 
-        if c < num_entities:
-            print(f"Checking if {r},{c} can be dropped")
+        # if c < num_entities:
+            # print(f"Checking if {r},{c} can be dropped")
         entity_reachable = _has_entity_in_component(
                 [r], tmp_col, row_wise_adj_index, num_entities, c
         )
 
         # add the edge back if we need it
         if not entity_reachable:
-            print("Not found")
+            # print("Not found")
             keep_mask[i] = True
             row_wise_adj_index[r:, :] += 1
             row_wise_adj_index[r, 0] -= 1
+            # Check if entity is now reachable
+            assert _has_entity_in_component(
+                [r], col[keep_mask], row_wise_adj_index, num_entities, c
 
     return keep_mask
