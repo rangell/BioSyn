@@ -89,7 +89,7 @@ def special_partition(np.ndarray[INT_t, ndim=1] row,
     cdef INT_t max_value = row[len(row) - 1] if directed else col[len(col) - 1] # Last value is max because of sorting
     adj_index = _build_adj_index(row if directed else col, max_value)
 
-    for i in tqdm(ordered_indices, desc='Paritioning Joint Graph'):
+    for i in tqdm(ordered_indices, desc='Paritioning joint graph'):
         # Undirected: Skip iteration if the edge has already been dropped
         if keep_mask[i] == False:
             continue
@@ -118,7 +118,7 @@ def special_partition(np.ndarray[INT_t, ndim=1] row,
         # Undirected: Check if an entity can still be reached from c
         if not directed:
             c_entity_reachable = _has_entity_in_component(
-                [r], tmp_graph, adj_index, num_entities)
+                [c], tmp_graph, adj_index, num_entities)
 
         # Add (r,c) back if an entity cannot be reached from r or c (when undirected) without it
         if not (r_entity_reachable and c_entity_reachable):
