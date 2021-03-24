@@ -30,6 +30,7 @@ def parse_args():
     # Run settings
     parser.add_argument('--use_cuda',  action="store_true")
     parser.add_argument('--use_cluster_linking', action="store_true")
+    parser.add_argument('--directed_graph', action="store_true")
     parser.add_argument('--debug_mode', action="store_true")
     parser.add_argument('--normalize_vecs',  action="store_true")
     parser.add_argument('--type_given',  action="store_true")
@@ -96,6 +97,7 @@ def main(args):
         score_mode=args.score_mode,
         type_given=args.type_given,
         use_cluster_linking=args.use_cluster_linking,
+        directed=args.directed_graph,
         debug_mode=args.debug_mode
     )
     
@@ -119,7 +121,8 @@ def main(args):
         output_file_name = os.path.join(args.output_dir,f"{__import__('calendar').timegm(__import__('time').gmtime())}_predictions_eval")
         result_overview = {
             'n_entities': result_evalset[0]['n_entities'],
-            'n_mentions': result_evalset[0]['n_mentions']
+            'n_mentions': result_evalset[0]['n_mentions'],
+            'directed': args.directed_graph
         }
         for results in result_evalset:
             k = results['k_candidates']

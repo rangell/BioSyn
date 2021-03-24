@@ -383,7 +383,7 @@ def get_query_nn(biosyn,
     return np.array(cand_idxs[:topk]), np.array(scores[:topk])
 
 
-def partition_graph(graph, n_entities, return_clusters=False):
+def partition_graph(graph, n_entities, directed, return_clusters=False):
     """
     Parameters
     ----------
@@ -391,6 +391,8 @@ def partition_graph(graph, n_entities, return_clusters=False):
         object containing rows, cols, data, and shape of the entity-mention joint graph
     n_entities : int
         number of entities in the dictionary
+    directed : bool
+        whether the graph construction should be directed or undirected
     return_clusters : bool
         flag to indicate if clusters need to be returned from the partition
 
@@ -401,44 +403,12 @@ def partition_graph(graph, n_entities, return_clusters=False):
     clusters : dict
         (optional) contains arrays of connected component indices of the graph
     """
-    # _row = graph['rows']
-    # _col = graph['cols']
-    # _data = graph['data']
-    
-    # # Filter duplicates
-    # seen = set()
-    # _f_row, _f_col, _f_data = [], [], []
-    # for k, _ in enumerate(_row):
-    #     if (_row[k], _col[k]) in seen:
-    #         continue
-    #     seen.add((_row[k], _col[k]))
-    #     _f_row.append(_row[k])
-    #     _f_col.append(_col[k])
-    #     _f_data.append(_data[k])
-    # _row, _col, _data = list(map(np.array, (_f_row, _f_col, _f_data)))
-
-    # # Sort data for efficient DFS
-    # tuples = zip(_row, _col, _data)
-    # tuples = sorted(tuples, key=lambda x: (x[0], -x[1]))
-    # special_row, special_col, special_data = zip(*tuples)
-    # special_row = np.asarray(special_row, dtype=np.int)
-    # special_col = np.asarray(special_col, dtype=np.int)
-    # special_data = np.asarray(special_data)
-
-    # # Order the edges in ascending order of similarity scores
-    # ordered_edge_indices = np.argsort(special_data)
-
-    # # Determine which edges to keep in the partitioned graph
-    # keep_edge_mask = special_partition(
-    #     special_row,
-    #     special_col,
-    #     ordered_edge_indices,
-    #     n_entities)
     rows, cols, data = cluster_linking_partition(
         graph['rows'],
         graph['cols'],
         graph['data'],
-        n_entities
+        n_entities,
+        directed
     )
     # Construct the partitioned graph
     partitioned_graph = coo_matrix(
@@ -448,7 +418,7 @@ def partition_graph(graph, n_entities, return_clusters=False):
         # Get an array with each graph index marked with the component label that it is connected to
         _, cc_labels = connected_components(
             csgraph=partitioned_graph,
-            directed=True,
+            directed=directed,
             return_labels=True)
         # Store clusters of indices marked with labels with at least 2 connected components
         unique_cc_labels, cc_sizes = np.unique(cc_labels, return_counts=True)
@@ -560,6 +530,7 @@ def predict_topk_cluster_link(biosyn,
                               eval_dictionary,
                               eval_queries,
                               topk,
+                              directed,
                               output_dir,
                               score_mode='hybrid',
                               debug_mode=False):
@@ -574,6 +545,8 @@ def predict_topk_cluster_link(biosyn,
         mention queries to evaluate
     topk : int
         the number of nearest-neighbour mention candidates to consider
+    directed : bool
+        whether the graph construction should be directed or undirected
     output_dir : str
         output directory path for intermediate files and results
     score_mode : str
@@ -673,7 +646,7 @@ def predict_topk_cluster_link(biosyn,
         print(f"Graph (k={k}):")
         # Partition graph based on cluster-linking constraints
         partitioned_graph, clusters = partition_graph(
-            joint_graphs[k], n_entities, return_clusters=True)
+            joint_graphs[k], n_entities, directed, return_clusters=True)
         # Infer predictions from clusters
         result = analyzeClusters(clusters, eval_dictionary, eval_queries, k, debug_mode)
         # Store result
@@ -689,6 +662,7 @@ def evaluate(biosyn,
              score_mode='hybrid',
              type_given=False,
              use_cluster_linking=False,
+             directed=True,
              debug_mode=False):
     """
     predict topk and evaluate accuracy
@@ -711,6 +685,8 @@ def evaluate(biosyn,
         whether or not to restrict entity set to ones with gold type
     use_cluster_linking : bool
         flag indicating whether the cluster linking inference should be applied or not
+    directed : bool
+        whether the graph construction should be directed or undirected
     debug_mode : bool
         Flag to enable reporting debug statistics for cluster linking
 
@@ -721,7 +697,7 @@ def evaluate(biosyn,
     """
     if use_cluster_linking:
         result = predict_topk_cluster_link(
-            biosyn, eval_dictionary, eval_queries, topk, output_dir, score_mode, debug_mode)
+            biosyn, eval_dictionary, eval_queries, topk, directed, output_dir, score_mode, debug_mode)
     else:
         result = predict_topk(
             biosyn, eval_dictionary, eval_queries, topk, score_mode, type_given)
